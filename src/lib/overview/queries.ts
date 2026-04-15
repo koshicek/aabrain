@@ -76,7 +76,7 @@ export async function queryDailyOverview(dateTo: string) {
     LEFT JOIN (
       SELECT campaign_id, currency_code FROM \`${DATASET}.dim_campaign\` WHERE is_current = true
     ) c ON r.campaign_id = c.campaign_id
-    WHERE r.ingressed_at >= DATE_SUB(PARSE_DATE('%Y-%m-%d', @dateTo), INTERVAL 14 DAY)
+    WHERE r.ingressed_at >= DATE_SUB(PARSE_DATE('%Y-%m-%d', @dateTo), INTERVAL 60 DAY)
       AND r.ingressed_at <= PARSE_DATE('%Y-%m-%d', @dateTo)
     GROUP BY d, currency
     ORDER BY d

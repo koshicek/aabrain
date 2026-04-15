@@ -191,36 +191,83 @@ function ErrorBanner({ error, onClose }: { error: string; onClose: () => void })
 // ── Daily metrics ──
 
 function DailySection({ data }: { data: DailyOverview[] }) {
+  const [period, setPeriod] = useState<"7d" | "30d" | "custom">("7d");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+
   if (data.length === 0) return null;
-  const yesterday = data[data.length - 1];
-  const weekDays = data.slice(-7);
-  const weekAvg = {
-    revenueCzk: weekDays.reduce((s, d) => s + d.revenueCzk, 0) / weekDays.length,
-    activeVendors: Math.round(weekDays.reduce((s, d) => s + d.activeVendors, 0) / weekDays.length),
-    activeCampaigns: Math.round(weekDays.reduce((s, d) => s + d.activeCampaigns, 0) / weekDays.length),
-    roas: weekDays.reduce((s, d) => s + d.roas, 0) / weekDays.length,
+
+  // Filter data by selected period
+  let filtered: DailyOverview[];
+  let periodLabel: string;
+  let avgLabel: string;
+
+  if (period === "custom" && customFrom && customTo) {
+    filtered = data.filter((d) => d.date >= customFrom && d.date <= customTo);
+    periodLabel = `${customFrom} — ${customTo}`;
+    avgLabel = "vs průměr období";
+  } else {
+    const days = period === "30d" ? 30 : 7;
+    filtered = data.slice(-days);
+    periodLabel = period === "30d" ? "Posledních 30 dní" : "Posledních 7 dní";
+    avgLabel = period === "30d" ? "vs 30d avg" : "vs 7d avg";
+  }
+
+  if (filtered.length === 0) return null;
+
+  const lastDay = filtered[filtered.length - 1];
+  const avg = {
+    revenueCzk: filtered.reduce((s, d) => s + d.revenueCzk, 0) / filtered.length,
+    activeVendors: Math.round(filtered.reduce((s, d) => s + d.activeVendors, 0) / filtered.length),
+    activeCampaigns: Math.round(filtered.reduce((s, d) => s + d.activeCampaigns, 0) / filtered.length),
+    roas: filtered.reduce((s, d) => s + d.roas, 0) / filtered.length,
   };
 
-  function delta(current: number, avg: number) {
-    if (avg === 0) return 0;
-    return Math.round(((current - avg) / avg) * 1000) / 10;
+  function delta(current: number, a: number) {
+    if (a === 0) return 0;
+    return Math.round(((current - a) / a) * 1000) / 10;
   }
+
+  const title = period === "custom" ? "Vlastní období" : period === "30d" ? "Přehled za 30 dní" : "Denní přehled";
 
   return (
     <div className="card p-7">
-      <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-1">Denní přehled</h2>
-      <p className="text-[13px] text-[#86868b] mb-5">{yesterday.date}</p>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-[17px] font-semibold text-[#1d1d1f]">{title}</h2>
+          <p className="text-[13px] text-[#86868b] mt-0.5">
+            {period === "custom" ? periodLabel : `${lastDay.date} — ${periodLabel.toLowerCase()}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="seg-group h-9 items-center">
+            <button onClick={() => setPeriod("7d")} className={`seg-btn !py-0 h-7 ${period === "7d" ? "active" : ""}`}>7D</button>
+            <button onClick={() => setPeriod("30d")} className={`seg-btn !py-0 h-7 ${period === "30d" ? "active" : ""}`}>30D</button>
+            <button onClick={() => { setPeriod("custom"); if (!customFrom && data.length > 0) { setCustomFrom(data[0].date); setCustomTo(data[data.length - 1].date); } }}
+              className={`seg-btn !py-0 h-7 ${period === "custom" ? "active" : ""}`}>Vlastní</button>
+          </div>
+          {period === "custom" && (
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-9 bg-muted border-0 rounded-lg px-2 text-[12px] focus:ring-2 focus:ring-[#0071e3] outline-none w-[120px]" />
+              <span className="text-[#86868b] text-[12px]">—</span>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                className="h-9 bg-muted border-0 rounded-lg px-2 text-[12px] focus:ring-2 focus:ring-[#0071e3] outline-none w-[120px]" />
+            </div>
+          )}
+        </div>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-        <DailyMetric label="Obrat" value={fmt(yesterday.revenueCzk)} unit="CZK" delta={delta(yesterday.revenueCzk, weekAvg.revenueCzk)} />
-        <DailyMetric label="Aktivní vendoři" value={yesterday.activeVendors.toString()} delta={delta(yesterday.activeVendors, weekAvg.activeVendors)} />
-        <DailyMetric label="Aktivní kampaně" value={yesterday.activeCampaigns.toString()} delta={delta(yesterday.activeCampaigns, weekAvg.activeCampaigns)} />
-        <DailyMetric label="ROAS" value={yesterday.roas.toFixed(2)} unit="x" delta={delta(yesterday.roas, weekAvg.roas)} />
+        <DailyMetric label="Obrat" value={fmt(lastDay.revenueCzk)} unit="CZK" delta={delta(lastDay.revenueCzk, avg.revenueCzk)} avgLabel={avgLabel} />
+        <DailyMetric label="Aktivní vendoři" value={lastDay.activeVendors.toString()} delta={delta(lastDay.activeVendors, avg.activeVendors)} avgLabel={avgLabel} />
+        <DailyMetric label="Aktivní kampaně" value={lastDay.activeCampaigns.toString()} delta={delta(lastDay.activeCampaigns, avg.activeCampaigns)} avgLabel={avgLabel} />
+        <DailyMetric label="ROAS" value={lastDay.roas.toFixed(2)} unit="x" delta={delta(lastDay.roas, avg.roas)} avgLabel={avgLabel} />
       </div>
     </div>
   );
 }
 
-function DailyMetric({ label, value, unit, delta }: { label: string; value: string; unit?: string; delta: number }) {
+function DailyMetric({ label, value, unit, delta, avgLabel = "vs 7d avg" }: { label: string; value: string; unit?: string; delta: number; avgLabel?: string }) {
   const col = delta === 0 ? "text-[#86868b]" : delta > 0 ? "text-green" : "text-red";
   return (
     <div className="bg-muted/60 rounded-2xl p-5">
@@ -229,7 +276,7 @@ function DailyMetric({ label, value, unit, delta }: { label: string; value: stri
         <span className="text-[24px] font-semibold tracking-tight text-[#1d1d1f]">{value}</span>
         {unit && <span className="text-[12px] text-[#86868b]">{unit}</span>}
       </div>
-      <p className={`text-[12px] mt-1 ${col}`}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% vs 7d avg</p>
+      <p className={`text-[12px] mt-1 ${col}`}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% {avgLabel}</p>
     </div>
   );
 }
