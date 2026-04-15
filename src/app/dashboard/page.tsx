@@ -240,6 +240,9 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
             <span className="text-[13px] text-[#86868b] font-normal">Brain</span>
+            <span className="text-[#d2d2d7] mx-3">|</span>
+            <a href="/overview" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Overview</a>
+            <span className="text-[13px] font-medium text-[#1d1d1f]">Daily Report</span>
           </div>
           <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">
             Odhlásit

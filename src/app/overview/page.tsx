@@ -97,8 +97,9 @@ export default function Overview() {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
             <span className="text-[13px] text-[#86868b]">Brain</span>
-            <span className="text-[#d2d2d7] mx-2">|</span>
+            <span className="text-[#d2d2d7] mx-3">|</span>
             <span className="text-[13px] font-medium text-[#1d1d1f]">Overview</span>
+            <a href="/dashboard" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Daily Report</a>
           </div>
           <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Odhlásit</button>
         </div>
