@@ -141,7 +141,8 @@ export default function Overview() {
             {/* ── Weekly Table ── */}
             <div className="card p-7 overflow-x-auto">
               <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Týdenní report</h2>
-              <WeeklyTable countries={report.countries} totals={report.totals} totalQuarters={report.totalQuarters} />
+              <WeeklyTable countries={report.countries} totals={report.totals} totalQuarters={report.totalQuarters}
+                quarterlyActuals={report.quarterlyActuals || []} countryQuarterlyActuals={report.countryQuarterlyActuals || []} />
             </div>
 
             {/* ── Top 10 Vendors ── */}
@@ -534,7 +535,11 @@ function TargetChart({ totals, quarterlyActuals }: { totals: TotalWeekly[]; quar
 
 // ── Weekly table (matches the screenshot structure) ──
 
-function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryWeekly[]; totals: TotalWeekly[]; totalQuarters: QuarterMetrics[] }) {
+function WeeklyTable({ countries, totals, totalQuarters, quarterlyActuals, countryQuarterlyActuals }: {
+  countries: CountryWeekly[]; totals: TotalWeekly[]; totalQuarters: QuarterMetrics[];
+  quarterlyActuals: Array<{ quarter: number; obratCzk: number }>;
+  countryQuarterlyActuals: Array<{ quarter: number; country: string; currency: string; obrat: number; obratCzk: number }>;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Scroll to right on mount
@@ -560,24 +565,29 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
   const finalQ = totalQuarters.find((tq) => tq.label === `Q${lastQ}`);
   if (finalQ) columns.push({ type: "quarter", data: finalQ });
 
-  // YTD totals
-  const ytdRevenueCzk = totals.reduce((s, t) => s + t.revenueCzk, 0);
+  // YTD totals (use precise quarterly data)
+  const ytdRevenueCzk = quarterlyActuals.reduce((s, qa) => s + qa.obratCzk, 0) || totals.reduce((s, t) => s + t.revenueCzk, 0);
   const ytdSpendCzk = totals.reduce((s, t) => s + t.spendCzk, 0);
   const ytdRoas = ytdSpendCzk > 0 ? Math.round((ytdRevenueCzk / ytdSpendCzk) * 100) / 100 : 0;
   const ytdVendors = Math.max(...totals.map((t) => t.uniqueVendors), 0);
   const ytdCampaigns = Math.max(...totals.map((t) => t.activeCampaigns), 0);
 
-  // Per-country YTD
+  // Per-country YTD (use precise quarterly data for obrat)
   function countryYtd(country: string) {
     const c = countries.find((cc) => cc.country === country);
     if (!c) return { vendors: 0, campaigns: 0, revenue: 0, roas: 0 };
-    const rev = c.weeks.reduce((s, w) => s + w.revenue, 0);
+    // Sum precise quarterly obrat for this country
+    let preciseRev = 0;
+    for (const [key, val] of preciseQCountry) {
+      if (key.startsWith(`${country}:`)) preciseRev += val;
+    }
+    const rev = preciseRev > 0 ? preciseRev : c.weeks.reduce((s, w) => s + w.revenue, 0);
     const sp = c.weeks.reduce((s, w) => s + w.spend, 0);
     return {
       vendors: Math.max(...c.weeks.map((w) => w.activeVendors), 0),
       campaigns: Math.max(...c.weeks.map((w) => w.activeCampaigns), 0),
       revenue: rev,
-      roas: sp > 0 ? Math.round((rev / sp) * 100) / 100 : 0,
+      roas: rev > 0 ? Math.round((sp / rev) * 100) / 100 : 0,
     };
   }
 
@@ -589,6 +599,13 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
   function countryQuarterData(country: string, label: string) {
     const c = countries.find((cc) => cc.country === country);
     return c?.quarters.find((q) => q.label === label);
+  }
+
+  // Precise quarterly obrat lookups (from daily-level data)
+  const preciseQTotal = new Map(quarterlyActuals.map((qa) => [qa.quarter, qa.obratCzk]));
+  const preciseQCountry = new Map<string, number>(); // key: "CZ:1" -> obrat
+  for (const cqa of countryQuarterlyActuals) {
+    preciseQCountry.set(`${cqa.country}:${cqa.quarter}`, cqa.obrat);
   }
 
   const countryColors: Record<string, string> = { CZ: "bg-[#0071e3]", SK: "bg-[#34C759]", HU: "bg-[#FF9500]" };
@@ -623,6 +640,7 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
                 columns={columns} color={countryColors[country]}
                 getWeek={(ws) => countryWeekData(country, ws)}
                 getQuarter={(label) => countryQuarterData(country, label)}
+                preciseQObrat={preciseQCountry}
                 ytd={ytd} />
             );
           })}
@@ -639,7 +657,13 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
           <MetricRow label="Aktivní kampaně" columns={columns} ytdVal={ytdCampaigns.toString()}
             weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; return d.activeCampaigns.toString(); }} isBold />
           <MetricRow label="Celkový obrat" columns={columns} ytdVal={`${fmt(ytdRevenueCzk)} Kč`}
-            weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; const rev = col.type === "week" ? (d as TotalWeekly).revenueCzk : (d as QuarterMetrics).revenueCzk; return `${fmt(rev)} Kč`; }} isBold highlight />
+            weekVal={(col) => {
+              if (col.type === "week") return `${fmt((col.data as TotalWeekly).revenueCzk)} Kč`;
+              const qLabel = (col.data as QuarterMetrics).label;
+              const qNum = parseInt(qLabel.replace("Q", ""));
+              const precise = preciseQTotal.get(qNum);
+              return precise !== undefined ? `${fmt(precise)} Kč` : `${fmt((col.data as QuarterMetrics).revenueCzk)} Kč`;
+            }} isBold highlight />
           <MetricRow label="ROAS" columns={columns} ytdVal={`${ytdRoas.toFixed(1)}x`}
             weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; return `${d.roas.toFixed(1)}x`; }} isBold />
         </tbody>
@@ -648,11 +672,12 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
   );
 }
 
-function CountryRows({ country, currency, columns, color, getWeek, getQuarter, ytd }: {
+function CountryRows({ country, currency, columns, color, getWeek, getQuarter, preciseQObrat, ytd }: {
   country: string; currency: string; color: string;
   columns: Array<{ type: "week" | "quarter"; data: unknown }>;
   getWeek: (ws: string) => { activeVendors: number; activeCampaigns: number; revenue: number; roas: number } | undefined;
   getQuarter: (label: string) => QuarterMetrics | undefined;
+  preciseQObrat: Map<string, number>;
   ytd: { vendors: number; campaigns: number; revenue: number; roas: number };
 }) {
   return (
@@ -679,7 +704,11 @@ function CountryRows({ country, currency, columns, color, getWeek, getQuarter, y
       }} />
       <MetricRow label="Celkový obrat" columns={columns} highlight ytdVal={`${fmt(ytd.revenue)} ${currency}`} weekVal={(col) => {
         if (col.type === "week") { const d = getWeek((col.data as TotalWeekly).weekStart); return d ? `${fmt(d.revenue)} ${currency}` : "—"; }
-        const d = getQuarter((col.data as QuarterMetrics).label); return d ? `${fmt(d.revenue)} ${currency}` : "—";
+        const qLabel = (col.data as QuarterMetrics).label;
+        const qNum = parseInt(qLabel.replace("Q", ""));
+        const precise = preciseQObrat.get(`${country}:${qNum}`);
+        if (precise !== undefined) return `${fmt(precise)} ${currency}`;
+        const d = getQuarter(qLabel); return d ? `${fmt(d.revenue)} ${currency}` : "—";
       }} />
       <MetricRow label="ROAS" columns={columns} ytdVal={`${ytd.roas.toFixed(1)}x`} weekVal={(col) => {
         if (col.type === "week") { const d = getWeek((col.data as TotalWeekly).weekStart); return d ? `${d.roas.toFixed(1)}x` : "—"; }

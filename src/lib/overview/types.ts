@@ -69,10 +69,19 @@ export interface QuarterlyActual {
   obratCzk: number;
 }
 
+export interface CountryQuarterlyActual {
+  quarter: number;
+  country: string;
+  currency: string;
+  obrat: number;       // in local currency
+  obratCzk: number;
+}
+
 export interface OverviewReport {
   dateFrom: string;
   dateTo: string;
   quarterlyActuals: QuarterlyActual[];
+  countryQuarterlyActuals: CountryQuarterlyActual[];
   countries: CountryWeekly[];
   totals: TotalWeekly[];
   totalQuarters: QuarterMetrics[];

@@ -10,6 +10,7 @@ import type {
   DailyOverview,
   TopVendor,
   QuarterlyActual,
+  CountryQuarterlyActual,
   OverviewReport,
 } from "./types";
 import type { ExchangeRates } from "@/lib/optimization/currency";
@@ -304,11 +305,15 @@ export function buildOverviewReport(
 
   // ── Quarterly actuals (precise, from daily data, not weekly) ──
   const qaMap = new Map<number, number>();
+  const countryQuarterlyActuals: CountryQuarterlyActual[] = [];
   for (const r of quarterlyRows) {
     const q = num(r.q);
     const cur = r.currency || "CZK";
-    const czk = toCzk(num(r.obrat), cur, rates);
+    const obrat = num(r.obrat);
+    const czk = toCzk(obrat, cur, rates);
     qaMap.set(q, (qaMap.get(q) || 0) + czk);
+    const country = CC[cur] || "CZ";
+    countryQuarterlyActuals.push({ quarter: q, country, currency: cur, obrat: Math.round(obrat * 100) / 100, obratCzk: Math.round(czk * 100) / 100 });
   }
   const quarterlyActuals: QuarterlyActual[] = [1, 2, 3, 4]
     .filter((q) => qaMap.has(q))
@@ -318,6 +323,7 @@ export function buildOverviewReport(
     dateFrom,
     dateTo,
     quarterlyActuals,
+    countryQuarterlyActuals,
     countries,
     totals,
     totalQuarters,
