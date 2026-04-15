@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { storage } from "@/lib/storage";
 import type { OverviewReport, CountryWeekly, TotalWeekly, QuarterMetrics, DailyOverview, TopVendor } from "@/lib/overview/types";
 
@@ -135,6 +135,14 @@ export default function Overview() {
               <div className="card p-7">
                 <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Týdenní obrat a aktivní vendoři</h2>
                 <WeeklyChart totals={report.totals} />
+              </div>
+            )}
+
+            {/* ── Target vs Actual ── */}
+            {report.totals.length > 1 && year === 2026 && (
+              <div className="card p-7">
+                <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Plnění cíle</h2>
+                <TargetChart totals={report.totals} />
               </div>
             )}
 
@@ -335,9 +343,158 @@ function WeeklyChart({ totals }: { totals: TotalWeekly[] }) {
   );
 }
 
+// ── Target vs Actual chart ──
+
+const QUARTERLY_TARGETS_2026: Record<number, number> = {
+  1: 12_500_000,
+  2: 25_596_000,
+  3: 26_316_000,
+  4: 65_588_000,
+};
+
+function getWeeklyTarget(weekStart: string): number {
+  const q = Math.floor(new Date(weekStart).getMonth() / 3) + 1;
+  const qTarget = QUARTERLY_TARGETS_2026[q] || 0;
+  // ~13 weeks per quarter
+  return qTarget / 13;
+}
+
+function TargetChart({ totals }: { totals: TotalWeekly[] }) {
+  const W = 900;
+  const H = 280;
+  const PAD = { top: 20, right: 20, bottom: 40, left: 70 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  // Cumulative actual and target
+  let cumActual = 0;
+  let cumTarget = 0;
+  const points = totals.map((t) => {
+    cumActual += t.revenueCzk;
+    cumTarget += getWeeklyTarget(t.weekStart);
+    return { weekLabel: t.weekLabel, weekRange: t.weekRange, actual: cumActual, target: cumTarget, weekRevenue: t.revenueCzk, weekTarget: getWeeklyTarget(t.weekStart) };
+  });
+
+  const maxVal = Math.max(...points.map((p) => Math.max(p.actual, p.target)), 1) * 1.1;
+
+  function xc(i: number) { return PAD.left + (points.length === 1 ? cW / 2 : (i / (points.length - 1)) * cW); }
+  function yVal(v: number) { return PAD.top + cH - (v / maxVal) * cH; }
+
+  const actualPath = points.map((p, i) => `${i === 0 ? "M" : "L"}${xc(i).toFixed(1)},${yVal(p.actual).toFixed(1)}`).join(" ");
+  const targetPath = points.map((p, i) => `${i === 0 ? "M" : "L"}${xc(i).toFixed(1)},${yVal(p.target).toFixed(1)}`).join(" ");
+  const actualArea = `${actualPath} L${xc(points.length - 1).toFixed(1)},${PAD.top + cH} L${xc(0).toFixed(1)},${PAD.top + cH} Z`;
+
+  const yStep = niceStep(maxVal, 4);
+  const yTicks: number[] = [];
+  for (let v = 0; v <= maxVal; v += yStep) yTicks.push(v);
+
+  const labelStep = Math.max(1, Math.floor(points.length / 12));
+
+  const [hover, setHover] = useState<number | null>(null);
+  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const svgX = ((e.clientX - rect.left) / rect.width) * W;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const d = Math.abs(xc(i) - svgX);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    setHover(best);
+  }
+  const hd = hover !== null ? points[hover] : null;
+
+  // Completion percentage
+  const lastPoint = points[points.length - 1];
+  const pct = lastPoint && lastPoint.target > 0 ? Math.round((lastPoint.actual / lastPoint.target) * 100) : 0;
+
+  return (
+    <div className="relative">
+      {/* Summary badge */}
+      <div className="flex items-center gap-3 mb-4">
+        <span className={`text-[14px] font-semibold ${pct >= 100 ? "text-green" : pct >= 80 ? "text-orange" : "text-red"}`}>
+          {pct}% cíle
+        </span>
+        <span className="text-[13px] text-[#86868b]">
+          {fmt(lastPoint?.actual || 0)} / {fmt(lastPoint?.target || 0)} CZK
+        </span>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+        <defs>
+          <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0071e3" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#0071e3" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid */}
+        {yTicks.map((v) => (
+          <g key={v}>
+            <line x1={PAD.left} y1={yVal(v)} x2={W - PAD.right} y2={yVal(v)} stroke="#e5e5ea" strokeWidth="0.5" />
+            <text x={PAD.left - 10} y={yVal(v) + 4} textAnchor="end" fontSize="11" fill="#86868b">{fmtAxis(v)}</text>
+          </g>
+        ))}
+
+        {/* Actual area + line */}
+        <path d={actualArea} fill="url(#actualGrad)" />
+        <path d={actualPath} fill="none" stroke="#0071e3" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Target line (dashed) */}
+        <path d={targetPath} fill="none" stroke="#FF9500" strokeWidth="2" strokeLinecap="round" strokeDasharray="6 4" opacity="0.8" />
+
+        {/* Dots on hover */}
+        {hover !== null && (
+          <>
+            <circle cx={xc(hover)} cy={yVal(points[hover].actual)} r="4.5" fill="white" stroke="#0071e3" strokeWidth="2" />
+            <circle cx={xc(hover)} cy={yVal(points[hover].target)} r="4" fill="white" stroke="#FF9500" strokeWidth="2" />
+            <line x1={xc(hover)} y1={PAD.top} x2={xc(hover)} y2={PAD.top + cH} stroke="#1d1d1f" strokeWidth="0.5" opacity="0.15" />
+          </>
+        )}
+
+        {/* X labels */}
+        {points.map((p, i) => {
+          if (i % labelStep !== 0 && i !== points.length - 1) return null;
+          return <text key={i} x={xc(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#86868b">{p.weekLabel}</text>;
+        })}
+      </svg>
+
+      {/* Tooltip */}
+      {hover !== null && hd && (
+        <div className="absolute pointer-events-none z-10 bg-white/95 backdrop-blur-lg shadow-lg rounded-xl border border-black/5 px-4 py-3"
+          style={{ left: `${(xc(hover) / W) * 100}%`, top: 4, transform: "translateX(-50%)" }}>
+          <p className="text-[12px] font-semibold text-[#1d1d1f] mb-1">{hd.weekLabel} ({hd.weekRange})</p>
+          <div className="space-y-0.5 text-[12px]">
+            <div className="flex justify-between gap-4"><span className="text-[#86868b]">Kumulativní obrat</span><span className="font-medium text-[#0071e3]">{fmt(hd.actual)} CZK</span></div>
+            <div className="flex justify-between gap-4"><span className="text-[#86868b]">Kumulativní cíl</span><span className="font-medium text-orange">{fmt(hd.target)} CZK</span></div>
+            <div className="flex justify-between gap-4"><span className="text-[#86868b]">Týdenní obrat</span><span className="font-medium">{fmt(hd.weekRevenue)} CZK</span></div>
+            <div className="flex justify-between gap-4"><span className="text-[#86868b]">Týdenní cíl</span><span className="font-medium">{fmt(hd.weekTarget)} CZK</span></div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-5 mt-3 justify-center text-[12px] text-[#86868b]">
+        <div className="flex items-center gap-1.5"><span className="w-3 h-[2px] bg-[#0071e3] rounded-full" /> Skutečnost (kumulativní)</div>
+        <div className="flex items-center gap-1.5">
+          <svg width="12" height="3"><line x1="0" y1="1.5" x2="12" y2="1.5" stroke="#FF9500" strokeWidth="2" strokeDasharray="3 2" /></svg>
+          Cíl (kumulativní)
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Weekly table (matches the screenshot structure) ──
 
 function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryWeekly[]; totals: TotalWeekly[]; totalQuarters: QuarterMetrics[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to right on mount
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [totals]);
+
   // Build columns: weeks interleaved with quarter summaries
   type Column = { type: "week"; data: TotalWeekly; idx: number } | { type: "quarter"; data: QuarterMetrics };
   const columns: Column[] = [];
@@ -351,9 +508,29 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
     lastQ = q;
     columns.push({ type: "week", data: totals[i], idx: i });
   }
-  // Add final quarter
   const finalQ = totalQuarters.find((tq) => tq.label === `Q${lastQ}`);
   if (finalQ) columns.push({ type: "quarter", data: finalQ });
+
+  // YTD totals
+  const ytdRevenueCzk = totals.reduce((s, t) => s + t.revenueCzk, 0);
+  const ytdSpendCzk = totals.reduce((s, t) => s + t.spendCzk, 0);
+  const ytdRoas = ytdSpendCzk > 0 ? Math.round((ytdRevenueCzk / ytdSpendCzk) * 100) / 100 : 0;
+  const ytdVendors = Math.max(...totals.map((t) => t.uniqueVendors), 0);
+  const ytdCampaigns = Math.max(...totals.map((t) => t.activeCampaigns), 0);
+
+  // Per-country YTD
+  function countryYtd(country: string) {
+    const c = countries.find((cc) => cc.country === country);
+    if (!c) return { vendors: 0, campaigns: 0, revenue: 0, roas: 0 };
+    const rev = c.weeks.reduce((s, w) => s + w.revenue, 0);
+    const sp = c.weeks.reduce((s, w) => s + w.spend, 0);
+    return {
+      vendors: Math.max(...c.weeks.map((w) => w.activeVendors), 0),
+      campaigns: Math.max(...c.weeks.map((w) => w.activeCampaigns), 0),
+      revenue: rev,
+      roas: sp > 0 ? Math.round((rev / sp) * 100) / 100 : 0,
+    };
+  }
 
   // Country data lookup
   function countryWeekData(country: string, weekStart: string) {
@@ -368,8 +545,10 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
   const countryColors: Record<string, string> = { CZ: "bg-[#0071e3]", SK: "bg-[#34C759]", HU: "bg-[#FF9500]" };
   const allCountries = ["CZ", "SK", "HU"].filter((c) => countries.some((cc) => cc.country === c));
 
+  const ytdColClass = "bg-[#0071e3]/8 font-semibold";
+
   return (
-    <div className="overflow-x-auto -mx-2">
+    <div ref={scrollRef} className="overflow-x-auto -mx-2">
       <table className="text-[12px] w-max min-w-full">
         <thead>
           <tr>
@@ -382,33 +561,37 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
                 )}
               </th>
             ))}
+            <th className={`px-4 py-2 text-center font-bold whitespace-nowrap text-[#0071e3] ${ytdColClass}`}>YTD</th>
           </tr>
         </thead>
         <tbody>
           {/* Per country */}
           {allCountries.map((country) => {
             const cur = countries.find((c) => c.country === country)?.currency || "CZK";
+            const ytd = countryYtd(country);
             return (
               <CountryRows key={country} country={country} currency={cur}
                 columns={columns} color={countryColors[country]}
                 getWeek={(ws) => countryWeekData(country, ws)}
-                getQuarter={(label) => countryQuarterData(country, label)} />
+                getQuarter={(label) => countryQuarterData(country, label)}
+                ytd={ytd} />
             );
           })}
 
           {/* Celkem */}
-          <tr><td colSpan={columns.length + 1} className="h-2" /></tr>
+          <tr><td colSpan={columns.length + 2} className="h-2" /></tr>
           <tr className="bg-[#1d1d1f]/5">
             <td className="sticky left-0 bg-[#f0f0f2] z-10 px-3 py-1.5 font-bold text-[#1d1d1f] text-[13px]" colSpan={1}>Celkem</td>
             {columns.map((_, i) => <td key={i} className="bg-[#f0f0f2]" />)}
+            <td className="bg-[#f0f0f2]" />
           </tr>
-          <MetricRow label="Aktivní vendoři" columns={columns}
+          <MetricRow label="Aktivní vendoři" columns={columns} ytdVal={ytdVendors.toString()}
             weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; return d.activeVendors.toString(); }} isBold />
-          <MetricRow label="Aktivní kampaně" columns={columns}
+          <MetricRow label="Aktivní kampaně" columns={columns} ytdVal={ytdCampaigns.toString()}
             weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; return d.activeCampaigns.toString(); }} isBold />
-          <MetricRow label="Celkový obrat" columns={columns}
+          <MetricRow label="Celkový obrat" columns={columns} ytdVal={`${fmt(ytdRevenueCzk)} Kč`}
             weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; const rev = col.type === "week" ? (d as TotalWeekly).revenueCzk : (d as QuarterMetrics).revenueCzk; return `${fmt(rev)} Kč`; }} isBold highlight />
-          <MetricRow label="ROAS" columns={columns}
+          <MetricRow label="ROAS" columns={columns} ytdVal={`${ytdRoas.toFixed(1)}x`}
             weekVal={(col) => { const d = col.type === "week" ? col.data as TotalWeekly : col.data as QuarterMetrics; return `${d.roas.toFixed(1)}x`; }} isBold />
         </tbody>
       </table>
@@ -416,15 +599,16 @@ function WeeklyTable({ countries, totals, totalQuarters }: { countries: CountryW
   );
 }
 
-function CountryRows({ country, currency, columns, color, getWeek, getQuarter }: {
+function CountryRows({ country, currency, columns, color, getWeek, getQuarter, ytd }: {
   country: string; currency: string; color: string;
   columns: Array<{ type: "week" | "quarter"; data: unknown }>;
   getWeek: (ws: string) => { activeVendors: number; activeCampaigns: number; revenue: number; roas: number } | undefined;
   getQuarter: (label: string) => QuarterMetrics | undefined;
+  ytd: { vendors: number; campaigns: number; revenue: number; roas: number };
 }) {
   return (
     <>
-      <tr><td colSpan={columns.length + 1} className="h-1" /></tr>
+      <tr><td colSpan={columns.length + 2} className="h-1" /></tr>
       <tr>
         <td className="sticky left-0 bg-white z-10 px-3 py-1.5">
           <div className="flex items-center gap-2">
@@ -434,20 +618,21 @@ function CountryRows({ country, currency, columns, color, getWeek, getQuarter }:
           </div>
         </td>
         {columns.map((_, i) => <td key={i} />)}
+        <td />
       </tr>
-      <MetricRow label="Aktivní vendoři" columns={columns} weekVal={(col) => {
+      <MetricRow label="Aktivní vendoři" columns={columns} ytdVal={ytd.vendors.toString()} weekVal={(col) => {
         if (col.type === "week") { const d = getWeek((col.data as TotalWeekly).weekStart); return d ? d.activeVendors.toString() : "—"; }
         const d = getQuarter((col.data as QuarterMetrics).label); return d ? d.activeVendors.toString() : "—";
       }} />
-      <MetricRow label="Aktivní kampaně" columns={columns} weekVal={(col) => {
+      <MetricRow label="Aktivní kampaně" columns={columns} ytdVal={ytd.campaigns.toString()} weekVal={(col) => {
         if (col.type === "week") { const d = getWeek((col.data as TotalWeekly).weekStart); return d ? d.activeCampaigns.toString() : "—"; }
         const d = getQuarter((col.data as QuarterMetrics).label); return d ? d.activeCampaigns.toString() : "—";
       }} />
-      <MetricRow label="Celkový obrat" columns={columns} highlight weekVal={(col) => {
+      <MetricRow label="Celkový obrat" columns={columns} highlight ytdVal={`${fmt(ytd.revenue)} ${currency}`} weekVal={(col) => {
         if (col.type === "week") { const d = getWeek((col.data as TotalWeekly).weekStart); return d ? `${fmt(d.revenue)} ${currency}` : "—"; }
         const d = getQuarter((col.data as QuarterMetrics).label); return d ? `${fmt(d.revenue)} ${currency}` : "—";
       }} />
-      <MetricRow label="ROAS" columns={columns} weekVal={(col) => {
+      <MetricRow label="ROAS" columns={columns} ytdVal={`${ytd.roas.toFixed(1)}x`} weekVal={(col) => {
         if (col.type === "week") { const d = getWeek((col.data as TotalWeekly).weekStart); return d ? `${d.roas.toFixed(1)}x` : "—"; }
         const d = getQuarter((col.data as QuarterMetrics).label); return d ? `${d.roas.toFixed(1)}x` : "—";
       }} />
@@ -455,10 +640,11 @@ function CountryRows({ country, currency, columns, color, getWeek, getQuarter }:
   );
 }
 
-function MetricRow({ label, columns, weekVal, isBold, highlight }: {
+function MetricRow({ label, columns, weekVal, ytdVal, isBold, highlight }: {
   label: string;
   columns: Array<{ type: "week" | "quarter"; data: unknown }>;
   weekVal: (col: { type: "week" | "quarter"; data: unknown }) => string;
+  ytdVal?: string;
   isBold?: boolean;
   highlight?: boolean;
 }) {
@@ -472,6 +658,9 @@ function MetricRow({ label, columns, weekVal, isBold, highlight }: {
           {weekVal(col)}
         </td>
       ))}
+      <td className={`px-4 py-1.5 text-right whitespace-nowrap bg-[#0071e3]/5 font-semibold ${isBold ? "text-[#0071e3]" : ""}`}>
+        {ytdVal || "—"}
+      </td>
     </tr>
   );
 }
