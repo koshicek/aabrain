@@ -142,7 +142,7 @@ export default function Overview() {
             {report.totals.length > 1 && year === 2026 && (
               <div className="card p-7">
                 <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Plnění cíle</h2>
-                <TargetChart totals={report.totals} />
+                <TargetChart totals={report.totals} quarterlyActuals={report.quarterlyActuals || []} />
               </div>
             )}
 
@@ -430,7 +430,7 @@ function getWeeklyTarget(weekStart: string): number {
   return qTarget / 13;
 }
 
-function TargetChart({ totals }: { totals: TotalWeekly[] }) {
+function TargetChart({ totals, quarterlyActuals }: { totals: TotalWeekly[]; quarterlyActuals: Array<{ quarter: number; obratCzk: number }> }) {
   const W = 900;
   const H = 280;
   const PAD = { top: 20, right: 20, bottom: 40, left: 70 };
@@ -474,22 +474,13 @@ function TargetChart({ totals }: { totals: TotalWeekly[] }) {
   }
   const hd = hover !== null ? points[hover] : null;
 
-  // Per-quarter breakdown
-  function weekQuarter(weekStart: string): number {
-    const thu = new Date(weekStart);
-    thu.setDate(thu.getDate() + 3);
-    return Math.floor(thu.getMonth() / 3) + 1;
-  }
-  const qActuals = new Map<number, number>();
-  for (const t of totals) {
-    const q = weekQuarter(t.weekStart);
-    qActuals.set(q, (qActuals.get(q) || 0) + t.revenueCzk);
-  }
+  // Per-quarter breakdown (from precise daily-level data)
+  const qaMap = new Map(quarterlyActuals.map((qa) => [qa.quarter, qa.obratCzk]));
   const quarterCards = [1, 2, 3, 4].map((q) => {
     const target = QUARTERLY_TARGETS_2026[q] || 0;
-    const actual = qActuals.get(q) || 0;
+    const actual = qaMap.get(q) || 0;
     const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
-    const hasData = qActuals.has(q);
+    const hasData = qaMap.has(q);
     return { q, target, actual, pct, hasData };
   });
 

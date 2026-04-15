@@ -64,9 +64,15 @@ export interface TopVendor {
   revenueChange: number;   // percentage
 }
 
+export interface QuarterlyActual {
+  quarter: number;
+  obratCzk: number;
+}
+
 export interface OverviewReport {
   dateFrom: string;
   dateTo: string;
+  quarterlyActuals: QuarterlyActual[];
   countries: CountryWeekly[];
   totals: TotalWeekly[];
   totalQuarters: QuarterMetrics[];

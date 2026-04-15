@@ -62,6 +62,29 @@ export async function queryWeeklyGlobalVendors(dateFrom: string, dateTo: string)
   }>(sql, { dateFrom, dateTo });
 }
 
+// Q1c: Quarterly actuals by calendar quarter (precise, not derived from weeks)
+export async function queryQuarterlyActuals(dateFrom: string, dateTo: string) {
+  const sql = `
+    SELECT
+      EXTRACT(QUARTER FROM r.ingressed_at) AS q,
+      COALESCE(c.currency_code, 'CZK') AS currency,
+      ROUND(SUM(r.ad_spend), 2) AS obrat
+    FROM \`${DATASET}.fact_realised_ad_agg\` r
+    LEFT JOIN (
+      SELECT campaign_id, currency_code FROM \`${DATASET}.dim_campaign\` WHERE is_current = true
+    ) c ON r.campaign_id = c.campaign_id
+    WHERE r.ingressed_at >= PARSE_DATE('%Y-%m-%d', @dateFrom)
+      AND r.ingressed_at <= PARSE_DATE('%Y-%m-%d', @dateTo)
+    GROUP BY q, currency
+    ORDER BY q
+  `;
+  return q<{
+    q: number;
+    currency: string;
+    obrat: number;
+  }>(sql, { dateFrom, dateTo });
+}
+
 // Q2: Daily metrics (last 14 days for daily view)
 export async function queryDailyOverview(dateTo: string) {
   const sql = `

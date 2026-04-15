@@ -9,6 +9,7 @@ import type {
   TotalWeekly,
   DailyOverview,
   TopVendor,
+  QuarterlyActual,
   OverviewReport,
 } from "./types";
 import type { ExchangeRates } from "@/lib/optimization/currency";
@@ -64,6 +65,11 @@ export function buildOverviewReport(
   globalVendorRows: Array<{
     week_start: { value: string } | string;
     unique_vendors: number;
+  }>,
+  quarterlyRows: Array<{
+    q: number;
+    currency: string;
+    obrat: number;
   }>,
   dailyRows: Array<{
     d: { value: string } | string;
@@ -287,9 +293,22 @@ export function buildOverviewReport(
     .sort((a, b) => b.thisWeekRevenue - a.thisWeekRevenue)
     .slice(0, 10);
 
+  // ── Quarterly actuals (precise, from daily data, not weekly) ──
+  const qaMap = new Map<number, number>();
+  for (const r of quarterlyRows) {
+    const q = num(r.q);
+    const cur = r.currency || "CZK";
+    const czk = toCzk(num(r.obrat), cur, rates);
+    qaMap.set(q, (qaMap.get(q) || 0) + czk);
+  }
+  const quarterlyActuals: QuarterlyActual[] = [1, 2, 3, 4]
+    .filter((q) => qaMap.has(q))
+    .map((q) => ({ quarter: q, obratCzk: Math.round((qaMap.get(q) || 0) * 100) / 100 }));
+
   return {
     dateFrom,
     dateTo,
+    quarterlyActuals,
     countries,
     totals,
     totalQuarters,
