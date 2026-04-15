@@ -10,7 +10,7 @@ export default function Overview() {
   const [token, setToken] = useState<string | null>(null);
   const [state, setState] = useState<ViewState>("loading");
   const [error, setError] = useState<string | null>(null);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const year = 2026;
   const [report, setReport] = useState<OverviewReport | null>(null);
 
   // Login
@@ -108,15 +108,7 @@ export default function Overview() {
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         {error && <ErrorBanner error={error} onClose={() => setError(null)} />}
 
-        {/* Year selector */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-[24px] font-semibold tracking-tight text-[#1d1d1f]">AlzaAds Overview {year}</h1>
-          <div className="seg-group h-9 items-center">
-            {[2025, 2026].map((y) => (
-              <button key={y} onClick={() => setYear(y)} className={`seg-btn !py-0 h-7 ${year === y ? "active" : ""}`}>{y}</button>
-            ))}
-          </div>
-        </div>
+        <h1 className="text-[24px] font-semibold tracking-tight text-[#1d1d1f] mb-8">alzaAds Přehled</h1>
 
         {state === "fetching" && (
           <div className="flex flex-col items-center py-24">
@@ -139,7 +131,7 @@ export default function Overview() {
             )}
 
             {/* ── Target vs Actual ── */}
-            {report.totals.length > 1 && year === 2026 && (
+            {report.totals.length > 1 && (
               <div className="card p-7">
                 <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Plnění cíle</h2>
                 <TargetChart totals={report.totals} quarterlyActuals={report.quarterlyActuals || []} />
@@ -191,104 +183,50 @@ function ErrorBanner({ error, onClose }: { error: string; onClose: () => void })
 // ── Daily metrics ──
 
 function DailySection({ data }: { data: DailyOverview[] }) {
-  const [period, setPeriod] = useState<"7d" | "30d" | "custom">("7d");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  if (data.length < 7) return null;
 
-  if (data.length === 0) return null;
+  // This week = last 7 days, previous week = 7 days before that
+  const thisWeek = data.slice(-7);
+  const prevWeek = data.slice(-14, -7);
 
-  // Filter data by selected period
-  let filtered: DailyOverview[];
-  let periodLabel: string;
-  let avgLabel: string;
-
-  if (period === "custom" && customFrom && customTo) {
-    filtered = data.filter((d) => d.date >= customFrom && d.date <= customTo);
-    periodLabel = `${customFrom} — ${customTo}`;
-    avgLabel = "vs průměr období";
-  } else {
-    const days = period === "30d" ? 30 : 7;
-    filtered = data.slice(-days);
-    periodLabel = period === "30d" ? "Posledních 30 dní" : "Posledních 7 dní";
-    avgLabel = period === "30d" ? "vs 30d avg" : "vs 7d avg";
+  function sum(arr: DailyOverview[]) {
+    const n = arr.length || 1;
+    return {
+      obrat: arr.reduce((s, d) => s + d.revenueCzk, 0),
+      avgObrat: arr.reduce((s, d) => s + d.revenueCzk, 0) / n,
+      avgVendors: Math.round(arr.reduce((s, d) => s + d.activeVendors, 0) / n),
+      avgCampaigns: Math.round(arr.reduce((s, d) => s + d.activeCampaigns, 0) / n),
+      avgRoas: arr.reduce((s, d) => s + d.roas, 0) / n,
+    };
   }
 
-  if (filtered.length === 0) return null;
+  const tw = sum(thisWeek);
+  const pw = prevWeek.length >= 7 ? sum(prevWeek) : null;
 
-  const lastDay = filtered[filtered.length - 1];
-  const n = filtered.length;
-  const totalObrat = filtered.reduce((s, d) => s + d.revenueCzk, 0);
-  const avg = {
-    revenueCzk: totalObrat / n,
-    activeVendors: Math.round(filtered.reduce((s, d) => s + d.activeVendors, 0) / n),
-    activeCampaigns: Math.round(filtered.reduce((s, d) => s + d.activeCampaigns, 0) / n),
-    roas: filtered.reduce((s, d) => s + d.roas, 0) / n,
-  };
-
-  // For 7D: show last day, delta vs avg. For 30D/custom: show avg, delta = last day vs avg
-  const isDaily = period === "7d";
-  const display = isDaily ? lastDay : {
-    revenueCzk: avg.revenueCzk,
-    activeVendors: avg.activeVendors,
-    activeCampaigns: avg.activeCampaigns,
-    roas: avg.roas,
-  };
-
-  function delta(current: number, a: number) {
-    if (a === 0) return 0;
-    return Math.round(((current - a) / a) * 1000) / 10;
+  function delta(current: number, prev: number | undefined) {
+    if (prev === undefined || prev === 0) return undefined;
+    return Math.round(((current - prev) / prev) * 1000) / 10;
   }
 
-  const title = period === "custom" ? "Vlastní období" : period === "30d" ? "Přehled za 30 dní" : "Denní přehled";
-  const subtitle = isDaily
-    ? lastDay.date
-    : period === "custom"
-      ? periodLabel
-      : `${filtered[0].date} — ${lastDay.date}`;
+  const dateRange = `${thisWeek[0].date} — ${thisWeek[thisWeek.length - 1].date}`;
 
   return (
     <div className="card p-7">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-[17px] font-semibold text-[#1d1d1f]">{title}</h2>
-          <p className="text-[13px] text-[#86868b] mt-0.5">{subtitle}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="seg-group h-9 items-center">
-            <button onClick={() => setPeriod("7d")} className={`seg-btn !py-0 h-7 ${period === "7d" ? "active" : ""}`}>7D</button>
-            <button onClick={() => setPeriod("30d")} className={`seg-btn !py-0 h-7 ${period === "30d" ? "active" : ""}`}>30D</button>
-            <button onClick={() => { setPeriod("custom"); if (!customFrom && data.length > 0) { setCustomFrom(data[0].date); setCustomTo(data[data.length - 1].date); } }}
-              className={`seg-btn !py-0 h-7 ${period === "custom" ? "active" : ""}`}>Vlastní</button>
-          </div>
-          {period === "custom" && (
-            <div className="flex items-center gap-1.5">
-              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-9 bg-muted border-0 rounded-lg px-2 text-[12px] focus:ring-2 focus:ring-[#0071e3] outline-none w-[120px]" />
-              <span className="text-[#86868b] text-[12px]">—</span>
-              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                className="h-9 bg-muted border-0 rounded-lg px-2 text-[12px] focus:ring-2 focus:ring-[#0071e3] outline-none w-[120px]" />
-            </div>
-          )}
-        </div>
+      <div className="mb-5">
+        <h2 className="text-[17px] font-semibold text-[#1d1d1f]">Posledních 7 dní</h2>
+        <p className="text-[13px] text-[#86868b] mt-0.5">{dateRange}</p>
       </div>
-      <div className={`grid ${isDaily ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-5"} gap-5`}>
-        {!isDaily && (
-          <DailyMetric label="Celkový obrat" value={fmt(totalObrat)} unit="CZK" sub={`${n} dní`} />
-        )}
-        <DailyMetric label={isDaily ? "Obrat" : "Ø denní obrat"} value={fmt(display.revenueCzk)} unit="CZK"
-          delta={isDaily ? delta(lastDay.revenueCzk, avg.revenueCzk) : undefined} avgLabel={avgLabel} />
-        <DailyMetric label={isDaily ? "Aktivní vendoři" : "Ø vendoři/den"} value={display.activeVendors.toString()}
-          delta={isDaily ? delta(lastDay.activeVendors, avg.activeVendors) : undefined} avgLabel={avgLabel} />
-        <DailyMetric label={isDaily ? "Aktivní kampaně" : "Ø kampaně/den"} value={display.activeCampaigns.toString()}
-          delta={isDaily ? delta(lastDay.activeCampaigns, avg.activeCampaigns) : undefined} avgLabel={avgLabel} />
-        <DailyMetric label={isDaily ? "ROAS" : "Ø ROAS"} value={display.roas.toFixed(2)} unit="x"
-          delta={isDaily ? delta(lastDay.roas, avg.roas) : undefined} avgLabel={avgLabel} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+        <DailyMetric label="Obrat" value={fmt(tw.obrat)} unit="CZK" delta={delta(tw.obrat, pw?.obrat)} />
+        <DailyMetric label="Ø vendoři/den" value={tw.avgVendors.toString()} delta={delta(tw.avgVendors, pw?.avgVendors)} />
+        <DailyMetric label="Ø kampaně/den" value={tw.avgCampaigns.toString()} delta={delta(tw.avgCampaigns, pw?.avgCampaigns)} />
+        <DailyMetric label="Ø ROAS" value={tw.avgRoas.toFixed(2)} unit="x" delta={delta(tw.avgRoas, pw?.avgRoas)} />
       </div>
     </div>
   );
 }
 
-function DailyMetric({ label, value, unit, delta, avgLabel = "vs 7d avg", sub }: { label: string; value: string; unit?: string; delta?: number; avgLabel?: string; sub?: string }) {
+function DailyMetric({ label, value, unit, delta }: { label: string; value: string; unit?: string; delta?: number }) {
   const col = delta === undefined || delta === 0 ? "text-[#86868b]" : delta > 0 ? "text-green" : "text-red";
   return (
     <div className="bg-muted/60 rounded-2xl p-5">
@@ -297,8 +235,7 @@ function DailyMetric({ label, value, unit, delta, avgLabel = "vs 7d avg", sub }:
         <span className="text-[24px] font-semibold tracking-tight text-[#1d1d1f]">{value}</span>
         {unit && <span className="text-[12px] text-[#86868b]">{unit}</span>}
       </div>
-      {delta !== undefined && <p className={`text-[12px] mt-1 ${col}`}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% {avgLabel}</p>}
-      {sub && <p className="text-[12px] mt-1 text-[#86868b]">{sub}</p>}
+      {delta !== undefined && <p className={`text-[12px] mt-1 ${col}`}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% vs předchozích 7d</p>}
     </div>
   );
 }
