@@ -85,7 +85,27 @@ export async function queryQuarterlyActuals(dateFrom: string, dateTo: string) {
   }>(sql, { dateFrom, dateTo });
 }
 
-// Q2: Daily metrics (last 14 days for daily view)
+// Q2a: Daily deduplicated vendor + campaign count (across all markets)
+export async function queryDailyGlobalCounts(dateTo: string) {
+  const sql = `
+    SELECT
+      r.ingressed_at AS d,
+      COUNT(DISTINCT r.supplier_id) AS unique_vendors,
+      COUNT(DISTINCT r.campaign_id) AS unique_campaigns
+    FROM \`${DATASET}.fact_realised_ad_agg\` r
+    WHERE r.ingressed_at >= DATE_SUB(PARSE_DATE('%Y-%m-%d', @dateTo), INTERVAL 60 DAY)
+      AND r.ingressed_at <= PARSE_DATE('%Y-%m-%d', @dateTo)
+    GROUP BY d
+    ORDER BY d
+  `;
+  return q<{
+    d: { value: string } | string;
+    unique_vendors: number;
+    unique_campaigns: number;
+  }>(sql, { dateTo });
+}
+
+// Q2b: Daily metrics by currency (for obrat/ROAS conversion)
 export async function queryDailyOverview(dateTo: string) {
   const sql = `
     SELECT

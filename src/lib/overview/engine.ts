@@ -71,6 +71,11 @@ export function buildOverviewReport(
     currency: string;
     obrat: number;
   }>,
+  dailyGlobalRows: Array<{
+    d: { value: string } | string;
+    unique_vendors: number;
+    unique_campaigns: number;
+  }>,
   dailyRows: Array<{
     d: { value: string } | string;
     currency: string;
@@ -226,8 +231,13 @@ export function buildOverviewReport(
       roas: d.revCzk > 0 ? Math.round((d.spCzk / d.revCzk) * 100) / 100 : 0,  // sales/obrat
     }));
 
-  // ── Daily view (converted to CZK) ──
-  // revenueCzk = obrat (ad_spend), spendCzk = sales_revenue (for ROAS)
+  // ── Daily global counts (deduplicated across markets) ──
+  const dailyGlobalMap = new Map<string, { vendors: number; campaigns: number }>();
+  for (const r of dailyGlobalRows) {
+    dailyGlobalMap.set(bqDate(r.d), { vendors: num(r.unique_vendors), campaigns: num(r.unique_campaigns) });
+  }
+
+  // ── Daily view (converted to CZK, with deduplicated counts) ──
   const dailyMap = new Map<string, DailyOverview>();
   for (const r of dailyRows) {
     const d = bqDate(r.d);
@@ -238,16 +248,15 @@ export function buildOverviewReport(
     if (existing) {
       existing.revenueCzk += obratCzk;
       existing.spendCzk += salesCzk;
-      existing.activeVendors += num(r.active_vendors);
-      existing.activeCampaigns += num(r.active_campaigns);
       existing.roas = existing.revenueCzk > 0 ? Math.round((existing.spendCzk / existing.revenueCzk) * 100) / 100 : 0;
     } else {
+      const global = dailyGlobalMap.get(d);
       dailyMap.set(d, {
         date: d,
         revenueCzk: obratCzk,
         spendCzk: salesCzk,
-        activeVendors: num(r.active_vendors),
-        activeCampaigns: num(r.active_campaigns),
+        activeVendors: global?.vendors || 0,
+        activeCampaigns: global?.campaigns || 0,
         roas: obratCzk > 0 ? Math.round((salesCzk / obratCzk) * 100) / 100 : 0,
       });
     }
