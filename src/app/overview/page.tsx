@@ -216,11 +216,22 @@ function DailySection({ data }: { data: DailyOverview[] }) {
   if (filtered.length === 0) return null;
 
   const lastDay = filtered[filtered.length - 1];
+  const n = filtered.length;
+  const totalObrat = filtered.reduce((s, d) => s + d.revenueCzk, 0);
   const avg = {
-    revenueCzk: filtered.reduce((s, d) => s + d.revenueCzk, 0) / filtered.length,
-    activeVendors: Math.round(filtered.reduce((s, d) => s + d.activeVendors, 0) / filtered.length),
-    activeCampaigns: Math.round(filtered.reduce((s, d) => s + d.activeCampaigns, 0) / filtered.length),
-    roas: filtered.reduce((s, d) => s + d.roas, 0) / filtered.length,
+    revenueCzk: totalObrat / n,
+    activeVendors: Math.round(filtered.reduce((s, d) => s + d.activeVendors, 0) / n),
+    activeCampaigns: Math.round(filtered.reduce((s, d) => s + d.activeCampaigns, 0) / n),
+    roas: filtered.reduce((s, d) => s + d.roas, 0) / n,
+  };
+
+  // For 7D: show last day, delta vs avg. For 30D/custom: show avg, delta = last day vs avg
+  const isDaily = period === "7d";
+  const display = isDaily ? lastDay : {
+    revenueCzk: avg.revenueCzk,
+    activeVendors: avg.activeVendors,
+    activeCampaigns: avg.activeCampaigns,
+    roas: avg.roas,
   };
 
   function delta(current: number, a: number) {
@@ -229,15 +240,18 @@ function DailySection({ data }: { data: DailyOverview[] }) {
   }
 
   const title = period === "custom" ? "Vlastní období" : period === "30d" ? "Přehled za 30 dní" : "Denní přehled";
+  const subtitle = isDaily
+    ? lastDay.date
+    : period === "custom"
+      ? periodLabel
+      : `${filtered[0].date} — ${lastDay.date}`;
 
   return (
     <div className="card p-7">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-[17px] font-semibold text-[#1d1d1f]">{title}</h2>
-          <p className="text-[13px] text-[#86868b] mt-0.5">
-            {period === "custom" ? periodLabel : `${lastDay.date} — ${periodLabel.toLowerCase()}`}
-          </p>
+          <p className="text-[13px] text-[#86868b] mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="seg-group h-9 items-center">
@@ -257,18 +271,25 @@ function DailySection({ data }: { data: DailyOverview[] }) {
           )}
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-        <DailyMetric label="Obrat" value={fmt(lastDay.revenueCzk)} unit="CZK" delta={delta(lastDay.revenueCzk, avg.revenueCzk)} avgLabel={avgLabel} />
-        <DailyMetric label="Aktivní vendoři" value={lastDay.activeVendors.toString()} delta={delta(lastDay.activeVendors, avg.activeVendors)} avgLabel={avgLabel} />
-        <DailyMetric label="Aktivní kampaně" value={lastDay.activeCampaigns.toString()} delta={delta(lastDay.activeCampaigns, avg.activeCampaigns)} avgLabel={avgLabel} />
-        <DailyMetric label="ROAS" value={lastDay.roas.toFixed(2)} unit="x" delta={delta(lastDay.roas, avg.roas)} avgLabel={avgLabel} />
+      <div className={`grid ${isDaily ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-5"} gap-5`}>
+        {!isDaily && (
+          <DailyMetric label="Celkový obrat" value={fmt(totalObrat)} unit="CZK" sub={`${n} dní`} />
+        )}
+        <DailyMetric label={isDaily ? "Obrat" : "Ø denní obrat"} value={fmt(display.revenueCzk)} unit="CZK"
+          delta={isDaily ? delta(lastDay.revenueCzk, avg.revenueCzk) : undefined} avgLabel={avgLabel} />
+        <DailyMetric label={isDaily ? "Aktivní vendoři" : "Ø vendoři/den"} value={display.activeVendors.toString()}
+          delta={isDaily ? delta(lastDay.activeVendors, avg.activeVendors) : undefined} avgLabel={avgLabel} />
+        <DailyMetric label={isDaily ? "Aktivní kampaně" : "Ø kampaně/den"} value={display.activeCampaigns.toString()}
+          delta={isDaily ? delta(lastDay.activeCampaigns, avg.activeCampaigns) : undefined} avgLabel={avgLabel} />
+        <DailyMetric label={isDaily ? "ROAS" : "Ø ROAS"} value={display.roas.toFixed(2)} unit="x"
+          delta={isDaily ? delta(lastDay.roas, avg.roas) : undefined} avgLabel={avgLabel} />
       </div>
     </div>
   );
 }
 
-function DailyMetric({ label, value, unit, delta, avgLabel = "vs 7d avg" }: { label: string; value: string; unit?: string; delta: number; avgLabel?: string }) {
-  const col = delta === 0 ? "text-[#86868b]" : delta > 0 ? "text-green" : "text-red";
+function DailyMetric({ label, value, unit, delta, avgLabel = "vs 7d avg", sub }: { label: string; value: string; unit?: string; delta?: number; avgLabel?: string; sub?: string }) {
+  const col = delta === undefined || delta === 0 ? "text-[#86868b]" : delta > 0 ? "text-green" : "text-red";
   return (
     <div className="bg-muted/60 rounded-2xl p-5">
       <p className="text-[13px] text-[#86868b] mb-1">{label}</p>
@@ -276,7 +297,8 @@ function DailyMetric({ label, value, unit, delta, avgLabel = "vs 7d avg" }: { la
         <span className="text-[24px] font-semibold tracking-tight text-[#1d1d1f]">{value}</span>
         {unit && <span className="text-[12px] text-[#86868b]">{unit}</span>}
       </div>
-      <p className={`text-[12px] mt-1 ${col}`}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% {avgLabel}</p>
+      {delta !== undefined && <p className={`text-[12px] mt-1 ${col}`}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}% {avgLabel}</p>}
+      {sub && <p className="text-[12px] mt-1 text-[#86868b]">{sub}</p>}
     </div>
   );
 }
