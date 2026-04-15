@@ -44,6 +44,24 @@ export async function queryWeeklyByCountry(dateFrom: string, dateTo: string) {
   }>(sql, { dateFrom, dateTo });
 }
 
+// Q1b: Weekly deduplicated vendor count (across all markets)
+export async function queryWeeklyGlobalVendors(dateFrom: string, dateTo: string) {
+  const sql = `
+    SELECT
+      DATE_TRUNC(r.ingressed_at, WEEK(MONDAY)) AS week_start,
+      COUNT(DISTINCT r.supplier_id) AS unique_vendors
+    FROM \`${DATASET}.fact_realised_ad_agg\` r
+    WHERE r.ingressed_at >= PARSE_DATE('%Y-%m-%d', @dateFrom)
+      AND r.ingressed_at <= PARSE_DATE('%Y-%m-%d', @dateTo)
+    GROUP BY week_start
+    ORDER BY week_start
+  `;
+  return q<{
+    week_start: { value: string } | string;
+    unique_vendors: number;
+  }>(sql, { dateFrom, dateTo });
+}
+
 // Q2: Daily metrics (last 14 days for daily view)
 export async function queryDailyOverview(dateTo: string) {
   const sql = `

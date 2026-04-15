@@ -133,7 +133,7 @@ export default function Overview() {
             {/* ── Chart ── */}
             {report.totals.length > 1 && (
               <div className="card p-7">
-                <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Týdenní obrat a ROAS</h2>
+                <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Týdenní obrat a aktivní vendoři</h2>
                 <WeeklyChart totals={report.totals} />
               </div>
             )}
@@ -236,20 +236,25 @@ function WeeklyChart({ totals }: { totals: TotalWeekly[] }) {
   const cH = H - PAD.top - PAD.bottom;
 
   const maxRev = Math.max(...totals.map((t) => t.revenueCzk), 1) * 1.1;
-  const maxRoas = Math.max(...totals.map((t) => t.roas), 1) * 1.2;
+  const maxVendors = Math.max(...totals.map((t) => t.uniqueVendors), 1) * 1.2;
   const barW = Math.min(cW / totals.length * 0.65, 28);
 
   function xc(i: number) { return PAD.left + (i + 0.5) * (cW / totals.length); }
   function yRev(v: number) { return PAD.top + cH - (v / maxRev) * cH; }
-  function yRoas(v: number) { return PAD.top + cH - (v / maxRoas) * cH; }
+  function yV(v: number) { return PAD.top + cH - (v / maxVendors) * cH; }
 
-  // ROAS line
-  const roasPath = totals.map((t, i) => `${i === 0 ? "M" : "L"}${xc(i).toFixed(1)},${yRoas(t.roas).toFixed(1)}`).join(" ");
+  // Vendors line
+  const vendorPath = totals.map((t, i) => `${i === 0 ? "M" : "L"}${xc(i).toFixed(1)},${yV(t.uniqueVendors).toFixed(1)}`).join(" ");
 
-  // Y-axis ticks
+  // Y-axis ticks (revenue left)
   const revStep = niceStep(maxRev, 4);
   const revTicks: number[] = [];
   for (let v = 0; v <= maxRev; v += revStep) revTicks.push(v);
+
+  // Y-axis ticks (vendors right)
+  const vStep = niceStep(maxVendors, 4);
+  const vTicks: number[] = [];
+  for (let v = 0; v <= maxVendors; v += vStep) vTicks.push(v);
 
   const labelStep = Math.max(1, Math.floor(totals.length / 12));
 
@@ -282,18 +287,18 @@ function WeeklyChart({ totals }: { totals: TotalWeekly[] }) {
         {/* Bars */}
         {totals.map((t, i) => (
           <rect key={i} x={xc(i) - barW / 2} y={yRev(t.revenueCzk)} width={barW} height={cH - (yRev(t.revenueCzk) - PAD.top)}
-            rx="3" fill={hover === i ? "#0071e3" : "#0071e3"} opacity={hover === i ? 1 : 0.7} />
+            rx="3" fill="#0071e3" opacity={hover === i ? 1 : 0.7} />
         ))}
 
-        {/* ROAS line */}
-        <path d={roasPath} fill="none" stroke="#34C759" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Vendors line */}
+        <path d={vendorPath} fill="none" stroke="#34C759" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         {totals.map((t, i) => (
-          <circle key={i} cx={xc(i)} cy={yRoas(t.roas)} r={hover === i ? 4.5 : 2.5} fill="white" stroke="#34C759" strokeWidth="2" />
+          <circle key={i} cx={xc(i)} cy={yV(t.uniqueVendors)} r={hover === i ? 4.5 : 2.5} fill="white" stroke="#34C759" strokeWidth="2" />
         ))}
 
-        {/* ROAS right axis */}
-        {[0, Math.round(maxRoas / 2), Math.round(maxRoas)].map((v) => (
-          <text key={v} x={W - PAD.right + 10} y={yRoas(v) + 4} fontSize="11" fill="#34C759">{v}x</text>
+        {/* Vendors right axis */}
+        {vTicks.map((v) => (
+          <text key={v} x={W - PAD.right + 10} y={yV(v) + 4} fontSize="11" fill="#34C759">{Math.round(v)}</text>
         ))}
 
         {/* Hover line */}
@@ -315,8 +320,8 @@ function WeeklyChart({ totals }: { totals: TotalWeekly[] }) {
           <p className="text-[12px] font-semibold text-[#1d1d1f] mb-1">{hd.weekLabel} ({hd.weekRange})</p>
           <div className="space-y-0.5 text-[12px]">
             <div className="flex justify-between gap-4"><span className="text-[#86868b]">Obrat</span><span className="font-medium">{fmt(hd.revenueCzk)} CZK</span></div>
-            <div className="flex justify-between gap-4"><span className="text-[#86868b]">ROAS</span><span className="font-medium text-green">{hd.roas.toFixed(1)}x</span></div>
-            <div className="flex justify-between gap-4"><span className="text-[#86868b]">Vendoři</span><span className="font-medium">{hd.activeVendors}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-[#86868b]">Vendoři (unikátní)</span><span className="font-medium text-green">{hd.uniqueVendors}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-[#86868b]">ROAS</span><span className="font-medium">{hd.roas.toFixed(1)}x</span></div>
             <div className="flex justify-between gap-4"><span className="text-[#86868b]">Kampaně</span><span className="font-medium">{hd.activeCampaigns}</span></div>
           </div>
         </div>
@@ -324,7 +329,7 @@ function WeeklyChart({ totals }: { totals: TotalWeekly[] }) {
 
       <div className="flex gap-5 mt-3 justify-center text-[12px] text-[#86868b]">
         <div className="flex items-center gap-1.5"><span className="w-3 h-3 bg-[#0071e3] rounded-sm opacity-70" /> Obrat (CZK)</div>
-        <div className="flex items-center gap-1.5"><span className="w-3 h-[2px] bg-green rounded-full" /> ROAS</div>
+        <div className="flex items-center gap-1.5"><span className="w-3 h-[2px] bg-green rounded-full" /> Aktivní vendoři (unikátní)</div>
       </div>
     </div>
   );

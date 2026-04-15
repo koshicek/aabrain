@@ -36,6 +36,7 @@ export interface TotalWeekly {
   weekLabel: string;
   weekRange: string;
   activeVendors: number;
+  uniqueVendors: number;  // deduplicated across all markets
   activeCampaigns: number;
   revenueCzk: number;
   spendCzk: number;

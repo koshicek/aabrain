@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryWeeklyByCountry, queryDailyOverview, queryTopVendors } from "@/lib/overview/queries";
+import { queryWeeklyByCountry, queryWeeklyGlobalVendors, queryDailyOverview, queryTopVendors } from "@/lib/overview/queries";
 import { buildOverviewReport } from "@/lib/overview/engine";
 import { getExchangeRates } from "@/lib/optimization/currency";
 import { cacheGet, cacheSet, optCacheKey } from "@/lib/optimization/cache";
@@ -30,13 +30,14 @@ export async function GET(req: NextRequest) {
 
     const rates = await getExchangeRates();
 
-    const [weeklyRows, dailyRows, vendorRows] = await Promise.all([
+    const [weeklyRows, globalVendorRows, dailyRows, vendorRows] = await Promise.all([
       queryWeeklyByCountry(dateFrom, dateTo),
+      queryWeeklyGlobalVendors(dateFrom, dateTo),
       queryDailyOverview(dateTo),
       queryTopVendors(dateTo),
     ]);
 
-    const report = buildOverviewReport(weeklyRows, dailyRows, vendorRows, rates, dateFrom, dateTo);
+    const report = buildOverviewReport(weeklyRows, globalVendorRows, dailyRows, vendorRows, rates, dateFrom, dateTo);
     cacheSet(cacheKey, report);
     return NextResponse.json(report);
   } catch (error) {

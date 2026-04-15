@@ -58,6 +58,10 @@ export function buildOverviewReport(
     revenue: number;
     spend: number;
   }>,
+  globalVendorRows: Array<{
+    week_start: { value: string } | string;
+    unique_vendors: number;
+  }>,
   dailyRows: Array<{
     d: { value: string } | string;
     currency: string;
@@ -154,6 +158,12 @@ export function buildOverviewReport(
       return { country, currency: cur, weeks, quarters };
     });
 
+  // ── Global deduplicated vendor counts ──
+  const globalVendorMap = new Map<string, number>();
+  for (const r of globalVendorRows) {
+    globalVendorMap.set(bqDate(r.week_start), num(r.unique_vendors));
+  }
+
   // ── Totals (all countries, converted to CZK) ──
   const totalWeeksMap = new Map<string, TotalWeekly>();
   for (const c of countries) {
@@ -173,6 +183,7 @@ export function buildOverviewReport(
           weekLabel: w.weekLabel,
           weekRange: w.weekRange,
           activeVendors: w.activeVendors,
+          uniqueVendors: globalVendorMap.get(w.weekStart) || 0,
           activeCampaigns: w.activeCampaigns,
           revenueCzk: revCzk,
           spendCzk: spCzk,
