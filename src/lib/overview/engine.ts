@@ -55,8 +55,8 @@ export function buildOverviewReport(
     currency: string;
     active_vendors: number;
     active_campaigns: number;
-    revenue: number;
-    spend: number;
+    obrat: number;
+    sales_revenue: number;
   }>,
   globalVendorRows: Array<{
     week_start: { value: string } | string;
@@ -67,16 +67,15 @@ export function buildOverviewReport(
     currency: string;
     active_vendors: number;
     active_campaigns: number;
-    revenue: number;
-    spend: number;
+    obrat: number;
+    sales_revenue: number;
   }>,
   vendorRows: Array<{
     supplier_id: string;
     team_name: string;
     week_start: { value: string } | string;
     currency: string;
-    revenue: number;
-    spend: number;
+    obrat: number;
   }>,
   rates: ExchangeRates,
   dateFrom: string,
@@ -96,17 +95,17 @@ export function buildOverviewReport(
     const weeks = weeksByCountry.get(country)!;
 
     const existing = weeks.get(ws);
-    const rev = num(r.revenue);
-    const sp = num(r.spend);
+    const obrat = num(r.obrat);           // ad_spend = AlzaAds revenue
+    const salesRev = num(r.sales_revenue); // vendor product sales
     const vendors = num(r.active_vendors);
     const camps = num(r.active_campaigns);
 
     if (existing) {
-      existing.revenue += rev;
-      existing.spend += sp;
+      existing.revenue += obrat;
+      existing.spend += salesRev;
       existing.activeVendors += vendors;
       existing.activeCampaigns += camps;
-      existing.roas = existing.spend > 0 ? Math.round((existing.revenue / existing.spend) * 100) / 100 : 0;
+      existing.roas = existing.revenue > 0 ? Math.round((existing.spend / existing.revenue) * 100) / 100 : 0;
     } else {
       weeks.set(ws, {
         weekStart: ws,
@@ -115,9 +114,9 @@ export function buildOverviewReport(
         currency: cur,
         activeVendors: vendors,
         activeCampaigns: camps,
-        revenue: rev,
-        spend: sp,
-        roas: sp > 0 ? Math.round((rev / sp) * 100) / 100 : 0,
+        revenue: obrat,           // "Celkový obrat" = ad_spend
+        spend: salesRev,          // keep sales_revenue for ROAS calc
+        roas: obrat > 0 ? Math.round((salesRev / obrat) * 100) / 100 : 0,
       });
     }
   }
@@ -149,10 +148,10 @@ export function buildOverviewReport(
           label: `Q${q}`,
           activeVendors: data.maxVendors,
           activeCampaigns: data.maxCampaigns,
-          revenue: Math.round(data.revenue * 100) / 100,
+          revenue: Math.round(data.revenue * 100) / 100,           // obrat in local currency
           revenueCzk: Math.round(toCzk(data.revenue, cur, rates) * 100) / 100,
-          spend: Math.round(data.spend * 100) / 100,
-          roas: data.spend > 0 ? Math.round((data.revenue / data.spend) * 100) / 100 : 0,
+          spend: Math.round(data.spend * 100) / 100,               // sales_revenue
+          roas: data.revenue > 0 ? Math.round((data.spend / data.revenue) * 100) / 100 : 0,  // sales_rev / obrat
         }));
 
       return { country, currency: cur, weeks, quarters };
@@ -165,18 +164,19 @@ export function buildOverviewReport(
   }
 
   // ── Totals (all countries, converted to CZK) ──
+  // revenueCzk = obrat (ad_spend) in CZK, spendCzk = sales_revenue in CZK (for ROAS)
   const totalWeeksMap = new Map<string, TotalWeekly>();
   for (const c of countries) {
     for (const w of c.weeks) {
       const existing = totalWeeksMap.get(w.weekStart);
-      const revCzk = toCzk(w.revenue, w.currency, rates);
-      const spCzk = toCzk(w.spend, w.currency, rates);
+      const obratCzk = toCzk(w.revenue, w.currency, rates);   // obrat = ad_spend
+      const salesCzk = toCzk(w.spend, w.currency, rates);     // sales_revenue for ROAS
       if (existing) {
         existing.activeVendors += w.activeVendors;
         existing.activeCampaigns += w.activeCampaigns;
-        existing.revenueCzk += revCzk;
-        existing.spendCzk += spCzk;
-        existing.roas = existing.spendCzk > 0 ? Math.round((existing.revenueCzk / existing.spendCzk) * 100) / 100 : 0;
+        existing.revenueCzk += obratCzk;
+        existing.spendCzk += salesCzk;
+        existing.roas = existing.revenueCzk > 0 ? Math.round((existing.spendCzk / existing.revenueCzk) * 100) / 100 : 0;
       } else {
         totalWeeksMap.set(w.weekStart, {
           weekStart: w.weekStart,
@@ -185,9 +185,9 @@ export function buildOverviewReport(
           activeVendors: w.activeVendors,
           uniqueVendors: globalVendorMap.get(w.weekStart) || 0,
           activeCampaigns: w.activeCampaigns,
-          revenueCzk: revCzk,
-          spendCzk: spCzk,
-          roas: spCzk > 0 ? Math.round((revCzk / spCzk) * 100) / 100 : 0,
+          revenueCzk: obratCzk,
+          spendCzk: salesCzk,
+          roas: obratCzk > 0 ? Math.round((salesCzk / obratCzk) * 100) / 100 : 0,
         });
       }
     }
@@ -211,34 +211,35 @@ export function buildOverviewReport(
       label: `Q${q}`,
       activeVendors: d.maxV,
       activeCampaigns: d.maxC,
-      revenue: d.revCzk,
+      revenue: d.revCzk,           // obrat in CZK
       revenueCzk: Math.round(d.revCzk * 100) / 100,
-      spend: d.spCzk,
-      roas: d.spCzk > 0 ? Math.round((d.revCzk / d.spCzk) * 100) / 100 : 0,
+      spend: d.spCzk,              // sales_revenue in CZK
+      roas: d.revCzk > 0 ? Math.round((d.spCzk / d.revCzk) * 100) / 100 : 0,  // sales/obrat
     }));
 
   // ── Daily view (converted to CZK) ──
+  // revenueCzk = obrat (ad_spend), spendCzk = sales_revenue (for ROAS)
   const dailyMap = new Map<string, DailyOverview>();
   for (const r of dailyRows) {
     const d = bqDate(r.d);
     const cur = r.currency || "CZK";
-    const revCzk = toCzk(num(r.revenue), cur, rates);
-    const spCzk = toCzk(num(r.spend), cur, rates);
+    const obratCzk = toCzk(num(r.obrat), cur, rates);
+    const salesCzk = toCzk(num(r.sales_revenue), cur, rates);
     const existing = dailyMap.get(d);
     if (existing) {
-      existing.revenueCzk += revCzk;
-      existing.spendCzk += spCzk;
+      existing.revenueCzk += obratCzk;
+      existing.spendCzk += salesCzk;
       existing.activeVendors += num(r.active_vendors);
       existing.activeCampaigns += num(r.active_campaigns);
-      existing.roas = existing.spendCzk > 0 ? Math.round((existing.revenueCzk / existing.spendCzk) * 100) / 100 : 0;
+      existing.roas = existing.revenueCzk > 0 ? Math.round((existing.spendCzk / existing.revenueCzk) * 100) / 100 : 0;
     } else {
       dailyMap.set(d, {
         date: d,
-        revenueCzk: revCzk,
-        spendCzk: spCzk,
+        revenueCzk: obratCzk,
+        spendCzk: salesCzk,
         activeVendors: num(r.active_vendors),
         activeCampaigns: num(r.active_campaigns),
-        roas: spCzk > 0 ? Math.round((revCzk / spCzk) * 100) / 100 : 0,
+        roas: obratCzk > 0 ? Math.round((salesCzk / obratCzk) * 100) / 100 : 0,
       });
     }
   }
@@ -251,22 +252,19 @@ export function buildOverviewReport(
   const thisWeek = sortedWeeks[0] || "";
   const lastWeek = sortedWeeks[1] || "";
 
-  // Aggregate per vendor per week (convert to CZK)
-  const vendorAgg = new Map<string, { name: string; thisRev: number; lastRev: number; thisSpend: number; lastSpend: number }>();
+  // Aggregate per vendor per week (convert to CZK) — obrat = ad_spend
+  const vendorAgg = new Map<string, { name: string; thisObrat: number; lastObrat: number }>();
   for (const r of vendorRows) {
     const ws = bqDate(r.week_start);
     if (ws !== thisWeek && ws !== lastWeek) continue;
     const key = r.supplier_id;
     const cur = r.currency || "CZK";
-    const revCzk = toCzk(num(r.revenue), cur, rates);
-    const spCzk = toCzk(num(r.spend), cur, rates);
-    const ex = vendorAgg.get(key) || { name: r.team_name || key, thisRev: 0, lastRev: 0, thisSpend: 0, lastSpend: 0 };
+    const obratCzk = toCzk(num(r.obrat), cur, rates);
+    const ex = vendorAgg.get(key) || { name: r.team_name || key, thisObrat: 0, lastObrat: 0 };
     if (ws === thisWeek) {
-      ex.thisRev += revCzk;
-      ex.thisSpend += spCzk;
+      ex.thisObrat += obratCzk;
     } else {
-      ex.lastRev += revCzk;
-      ex.lastSpend += spCzk;
+      ex.lastObrat += obratCzk;
     }
     vendorAgg.set(key, ex);
   }
@@ -275,13 +273,13 @@ export function buildOverviewReport(
     .map(([id, v]) => ({
       vendorId: id,
       vendorName: v.name,
-      thisWeekRevenue: Math.round(v.thisRev),
-      lastWeekRevenue: Math.round(v.lastRev),
-      thisWeekSpend: Math.round(v.thisSpend),
-      lastWeekSpend: Math.round(v.lastSpend),
-      thisWeekRoas: v.thisSpend > 0 ? Math.round((v.thisRev / v.thisSpend) * 100) / 100 : 0,
-      lastWeekRoas: v.lastSpend > 0 ? Math.round((v.lastRev / v.lastSpend) * 100) / 100 : 0,
-      revenueChange: v.lastRev > 0 ? Math.round(((v.thisRev - v.lastRev) / v.lastRev) * 1000) / 10 : 0,
+      thisWeekRevenue: Math.round(v.thisObrat),
+      lastWeekRevenue: Math.round(v.lastObrat),
+      thisWeekSpend: 0,
+      lastWeekSpend: 0,
+      thisWeekRoas: 0,
+      lastWeekRoas: 0,
+      revenueChange: v.lastObrat > 0 ? Math.round(((v.thisObrat - v.lastObrat) / v.lastObrat) * 1000) / 10 : 0,
     }))
     .sort((a, b) => b.thisWeekRevenue - a.thisWeekRevenue)
     .slice(0, 10);

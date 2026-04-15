@@ -55,7 +55,7 @@ export function cacheClear(): void {
 }
 
 // Increment when data shape changes to invalidate old cached entries
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 
 /** Build a cache key for optimization data */
 export function optCacheKey(

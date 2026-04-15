@@ -23,8 +23,8 @@ export async function queryWeeklyByCountry(dateFrom: string, dateTo: string) {
       COALESCE(c.currency_code, 'CZK') AS currency,
       COUNT(DISTINCT r.supplier_id) AS active_vendors,
       COUNT(DISTINCT r.campaign_id) AS active_campaigns,
-      ROUND(SUM(r.sales_revenue), 2) AS revenue,
-      ROUND(SUM(r.ad_spend), 2) AS spend
+      ROUND(SUM(r.ad_spend), 2) AS obrat,
+      ROUND(SUM(r.sales_revenue), 2) AS sales_revenue
     FROM \`${DATASET}.fact_realised_ad_agg\` r
     LEFT JOIN (
       SELECT campaign_id, currency_code FROM \`${DATASET}.dim_campaign\` WHERE is_current = true
@@ -39,8 +39,8 @@ export async function queryWeeklyByCountry(dateFrom: string, dateTo: string) {
     currency: string;
     active_vendors: number;
     active_campaigns: number;
-    revenue: number;
-    spend: number;
+    obrat: number;
+    sales_revenue: number;
   }>(sql, { dateFrom, dateTo });
 }
 
@@ -70,8 +70,8 @@ export async function queryDailyOverview(dateTo: string) {
       COALESCE(c.currency_code, 'CZK') AS currency,
       COUNT(DISTINCT r.supplier_id) AS active_vendors,
       COUNT(DISTINCT r.campaign_id) AS active_campaigns,
-      ROUND(SUM(r.sales_revenue), 2) AS revenue,
-      ROUND(SUM(r.ad_spend), 2) AS spend
+      ROUND(SUM(r.ad_spend), 2) AS obrat,
+      ROUND(SUM(r.sales_revenue), 2) AS sales_revenue
     FROM \`${DATASET}.fact_realised_ad_agg\` r
     LEFT JOIN (
       SELECT campaign_id, currency_code FROM \`${DATASET}.dim_campaign\` WHERE is_current = true
@@ -86,8 +86,8 @@ export async function queryDailyOverview(dateTo: string) {
     currency: string;
     active_vendors: number;
     active_campaigns: number;
-    revenue: number;
-    spend: number;
+    obrat: number;
+    sales_revenue: number;
   }>(sql, { dateTo });
 }
 
@@ -100,8 +100,7 @@ export async function queryTopVendors(dateTo: string) {
         t.team_name,
         DATE_TRUNC(r.ingressed_at, WEEK(MONDAY)) AS week_start,
         COALESCE(c.currency_code, 'CZK') AS currency,
-        ROUND(SUM(r.sales_revenue), 2) AS revenue,
-        ROUND(SUM(r.ad_spend), 2) AS spend
+        ROUND(SUM(r.ad_spend), 2) AS obrat
       FROM \`${DATASET}.fact_realised_ad_agg\` r
       LEFT JOIN (
         SELECT campaign_id, currency_code FROM \`${DATASET}.dim_campaign\` WHERE is_current = true
@@ -117,14 +116,13 @@ export async function queryTopVendors(dateTo: string) {
       GROUP BY r.supplier_id, t.team_name, week_start, currency
     )
     SELECT * FROM last_two_weeks
-    ORDER BY revenue DESC
+    ORDER BY obrat DESC
   `;
   return q<{
     supplier_id: string;
     team_name: string;
     week_start: { value: string } | string;
     currency: string;
-    revenue: number;
-    spend: number;
+    obrat: number;
   }>(sql, { dateTo });
 }
