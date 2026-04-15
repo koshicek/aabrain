@@ -41,8 +41,11 @@ function formatDateRange(weekStart: string): string {
   return `${f(d)}–${f(end)}`;
 }
 
-function getQuarter(dateStr: string): number {
-  return Math.floor(new Date(dateStr).getMonth() / 3) + 1;
+function getQuarter(weekStartStr: string): number {
+  // Use Thursday of the week to determine quarter (ISO standard)
+  const thu = new Date(weekStartStr);
+  thu.setDate(thu.getDate() + 3);
+  return Math.floor(thu.getMonth() / 3) + 1;
 }
 
 // ---------------------------------------------------------------------------

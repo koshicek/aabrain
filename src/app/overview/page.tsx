@@ -353,9 +353,11 @@ const QUARTERLY_TARGETS_2026: Record<number, number> = {
 };
 
 function getWeeklyTarget(weekStart: string): number {
-  const q = Math.floor(new Date(weekStart).getMonth() / 3) + 1;
+  // Use Thursday of the week to determine quarter (ISO standard)
+  const thu = new Date(weekStart);
+  thu.setDate(thu.getDate() + 3);
+  const q = Math.floor(thu.getMonth() / 3) + 1;
   const qTarget = QUARTERLY_TARGETS_2026[q] || 0;
-  // ~13 weeks per quarter
   return qTarget / 13;
 }
 
