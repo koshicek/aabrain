@@ -46,9 +46,42 @@ export default function Dashboard() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResponse | null>(null);
 
+  // Login
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  function handleLogout() {
+    storage.clearToken();
+    setToken(null);
+    setTeams([]);
+    setState("idle");
+    setReport(null);
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (data.error) { setError(data.error); return; }
+      storage.setToken(data.accessToken);
+      setToken(data.accessToken);
+      setFavorites(storage.getFavoriteTeams());
+      setState("idle");
+    } catch { setError("Přihlášení se nezdařilo."); }
+    finally { setLoginLoading(false); }
+  }
+
   useEffect(() => {
     const saved = storage.getToken();
-    if (!saved) { window.location.href = "/"; return; }
+    if (!saved) { setState("idle"); return; }
     setToken(saved);
     setFavorites(storage.getFavoriteTeams());
     setState("idle");
@@ -57,7 +90,7 @@ export default function Dashboard() {
   const loadTeams = useCallback(async (t: string) => {
     try {
       const res = await fetch("/api/reports?action=teams", { headers: { Authorization: `Bearer ${t}` } });
-      if (res.status === 401) { storage.clearToken(); window.location.href = "/"; return; }
+      if (res.status === 401) { handleLogout(); return; }
       const data = await res.json();
       setTeams(data.teams || []);
     } catch { setError("Nepodařilo se načíst klienty"); }
@@ -94,7 +127,7 @@ export default function Dashboard() {
         `/api/optimization?action=daily-report&teamId=${selectedTeam.id}&teamName=${encodeURIComponent(selectedTeam.name)}&dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}&currency=${currencyDisplay}&config=${configStr}${cp}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      if (res.status === 401) { storage.clearToken(); window.location.href = "/"; return; }
+      if (res.status === 401) { handleLogout(); return; }
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setReport(data as DailyReport);
@@ -153,6 +186,52 @@ export default function Dashboard() {
     </div>
   );
 
+  // ── Login screen ──
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-muted">
+        <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-black/5">
+          <div className="max-w-7xl mx-auto px-6 h-12 flex items-center">
+            <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
+            <span className="text-[13px] text-[#86868b] font-normal ml-2">Brain</span>
+          </div>
+        </header>
+        <main className="max-w-[360px] mx-auto px-6 mt-24">
+          <div className="text-center mb-8">
+            <h1 className="text-[28px] font-semibold tracking-tight text-[#1d1d1f]">alzaAds Brain</h1>
+            <p className="text-[15px] text-[#86868b] mt-2">Přihlaste se svým účtem</p>
+          </div>
+          {error && (
+            <div className="card px-5 py-3 mb-6 flex items-center justify-between border-l-4 border-l-red">
+              <p className="text-[13px] text-red">{error}</p>
+              <button onClick={() => setError(null)} className="text-[#86868b] hover:text-[#1d1d1f] text-lg leading-none">&times;</button>
+            </div>
+          )}
+          <div className="card p-8">
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-[13px] font-medium text-[#1d1d1f] mb-1.5">Email</label>
+                <input type="email" value={username} onChange={(e) => setUsername(e.target.value)} required
+                  className="w-full h-11 bg-[#f5f5f7] border-0 rounded-xl px-4 text-[15px] text-[#1d1d1f] placeholder:text-[#86868b] focus:ring-2 focus:ring-[#0071e3] outline-none"
+                  placeholder="vas@email.cz" />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#1d1d1f] mb-1.5">Heslo</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
+                  className="w-full h-11 bg-[#f5f5f7] border-0 rounded-xl px-4 text-[15px] text-[#1d1d1f] placeholder:text-[#86868b] focus:ring-2 focus:ring-[#0071e3] outline-none" />
+              </div>
+              <button type="submit" disabled={loginLoading}
+                className="w-full h-11 bg-[#0071e3] text-white text-[15px] font-medium rounded-xl hover:bg-[#0077ed] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] transition-transform">
+                {loginLoading ? "Přihlašování..." : "Přihlásit se"}
+              </button>
+            </form>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Authenticated dashboard ──
   return (
     <div className="min-h-screen bg-muted">
       {/* ── Header ── */}
@@ -162,8 +241,7 @@ export default function Dashboard() {
             <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
             <span className="text-[13px] text-[#86868b] font-normal">Brain</span>
           </div>
-          <button onClick={() => { storage.clearToken(); window.location.href = "/"; }}
-            className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">
+          <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">
             Odhlásit
           </button>
         </div>
