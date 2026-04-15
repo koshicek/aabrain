@@ -428,18 +428,36 @@ export default function Dashboard() {
             {report.attribution.yesterday && (
               <div className="card p-7">
                 <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Atribuce</h2>
-                <div className="grid grid-cols-3 gap-8">
-                  {[
-                    { label: "Direct", val: report.attribution.yesterday.directRevenue },
-                    { label: "Halo", val: report.attribution.yesterday.haloRevenue },
-                    { label: "View-through", val: report.attribution.yesterday.viewThroughRevenue },
-                  ].map(({ label, val }) => (
-                    <div key={label}>
-                      <p className="text-[13px] text-[#86868b] mb-1.5">{label}</p>
-                      <p className="text-[22px] font-semibold tracking-tight text-[#1d1d1f]">{fmt(val)} <span className="text-[14px] font-normal text-[#86868b]">{report.displayCurrency}</span></p>
+                {(() => {
+                  const a = report.attribution.yesterday;
+                  const baseRevenue = report.yesterday.revenue * (report.dailyTrend.length || 1);
+                  const baseSpend = report.yesterday.spend * (report.dailyTrend.length || 1);
+                  const enhancedRevenue = a.directRevenue + a.haloRevenue + a.viewThroughRevenue;
+                  const enhancedSpend = a.spend;
+                  const baseRoas = baseSpend > 0 ? baseRevenue / baseSpend : 0;
+                  const enhancedRoas = enhancedSpend > 0 ? enhancedRevenue / enhancedSpend : 0;
+                  const cur = report.displayCurrency;
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                      <div>
+                        <p className="text-[13px] text-[#86868b] mb-1.5">Base ROAS</p>
+                        <p className="text-[22px] font-semibold tracking-tight text-[#1d1d1f]">{baseRoas.toFixed(2)}<span className="text-[14px] font-normal text-[#86868b]">x</span></p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] text-[#86868b] mb-1.5">Base Revenue</p>
+                        <p className="text-[22px] font-semibold tracking-tight text-[#1d1d1f]">{fmt(baseRevenue)} <span className="text-[14px] font-normal text-[#86868b]">{cur}</span></p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] text-[#86868b] mb-1.5">Enhanced ROAS</p>
+                        <p className="text-[22px] font-semibold tracking-tight text-green">{enhancedRoas.toFixed(2)}<span className="text-[14px] font-normal text-[#86868b]">x</span></p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] text-[#86868b] mb-1.5">Enhanced Revenue</p>
+                        <p className="text-[22px] font-semibold tracking-tight text-green">{fmt(enhancedRevenue)} <span className="text-[14px] font-normal text-[#86868b]">{cur}</span></p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
               </div>
             )}
 
