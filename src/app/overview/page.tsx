@@ -474,16 +474,66 @@ function TargetChart({ totals }: { totals: TotalWeekly[] }) {
   }
   const hd = hover !== null ? points[hover] : null;
 
-  // Completion percentage
+  // Per-quarter breakdown
+  function weekQuarter(weekStart: string): number {
+    const thu = new Date(weekStart);
+    thu.setDate(thu.getDate() + 3);
+    return Math.floor(thu.getMonth() / 3) + 1;
+  }
+  const qActuals = new Map<number, number>();
+  for (const t of totals) {
+    const q = weekQuarter(t.weekStart);
+    qActuals.set(q, (qActuals.get(q) || 0) + t.revenueCzk);
+  }
+  const quarterCards = [1, 2, 3, 4].map((q) => {
+    const target = QUARTERLY_TARGETS_2026[q] || 0;
+    const actual = qActuals.get(q) || 0;
+    const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
+    const hasData = qActuals.has(q);
+    return { q, target, actual, pct, hasData };
+  });
+
+  // YTD totals
   const lastPoint = points[points.length - 1];
-  const pct = lastPoint && lastPoint.target > 0 ? Math.round((lastPoint.actual / lastPoint.target) * 100) : 0;
+  const ytdPct = lastPoint && lastPoint.target > 0 ? Math.round((lastPoint.actual / lastPoint.target) * 100) : 0;
 
   return (
     <div className="relative">
-      {/* Summary badge */}
+      {/* Quarterly breakdown */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {quarterCards.map(({ q, target, actual, pct, hasData }) => {
+          const col = !hasData ? "text-[#86868b]" : pct >= 100 ? "text-green" : pct >= 80 ? "text-orange" : "text-red";
+          return (
+            <div key={q} className="bg-muted/60 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[14px] font-semibold text-[#1d1d1f]">Q{q}</span>
+                <span className={`text-[14px] font-bold ${col}`}>{hasData ? `${pct}%` : "—"}</span>
+              </div>
+              <div className="space-y-1 text-[12px]">
+                <div className="flex justify-between">
+                  <span className="text-[#86868b]">Cíl</span>
+                  <span className="text-[#1d1d1f] font-medium">{fmt(target)} Kč</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#86868b]">Skutečnost</span>
+                  <span className={`font-medium ${col}`}>{hasData ? `${fmt(actual)} Kč` : "—"}</span>
+                </div>
+              </div>
+              {hasData && (
+                <div className="mt-2 h-1.5 bg-[#e5e5ea] rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${pct >= 100 ? "bg-green" : pct >= 80 ? "bg-orange" : "bg-red"}`}
+                    style={{ width: `${Math.min(pct, 100)}%` }} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* YTD summary */}
       <div className="flex items-center gap-3 mb-4">
-        <span className={`text-[14px] font-semibold ${pct >= 100 ? "text-green" : pct >= 80 ? "text-orange" : "text-red"}`}>
-          {pct}% cíle
+        <span className={`text-[14px] font-semibold ${ytdPct >= 100 ? "text-green" : ytdPct >= 80 ? "text-orange" : "text-red"}`}>
+          YTD: {ytdPct}%
         </span>
         <span className="text-[13px] text-[#86868b]">
           {fmt(lastPoint?.actual || 0)} / {fmt(lastPoint?.target || 0)} CZK
