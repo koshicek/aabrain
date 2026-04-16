@@ -18,6 +18,21 @@ export default function Overview() {
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
+  const [theme, setThemeState] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const saved = storage.getTheme();
+    setThemeState(saved);
+    document.documentElement.dataset.theme = saved;
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    setThemeState(next);
+    document.documentElement.dataset.theme = next;
+    storage.setTheme(next);
+  }
+
   function handleLogout() {
     storage.clearToken(); setToken(null); setState("idle"); setReport(null);
   }
@@ -102,7 +117,12 @@ export default function Overview() {
             <a href="/overview/daily" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Denní přehled</a>
             <a href="/dashboard" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Daily Report</a>
           </div>
-          <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Odhlásit</button>
+          <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} className="theme-toggle" title={theme === "light" ? "Tmavý režim" : "Světlý režim"}>
+              {theme === "light" ? "\u263E" : "\u2600"}
+            </button>
+            <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Odhlásit</button>
+          </div>
         </div>
       </header>
 

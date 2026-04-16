@@ -106,3 +106,137 @@ button, a, select, input {
   border-radius: 50%;
   animation: spin-smooth 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
+
+/* ─── Dark Mode ─────────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] body {
+  background-color: #000000;
+  color: #f5f5f7;
+}
+
+[data-theme="dark"] .card {
+  background: #1c1c1e;
+  border-color: rgba(255,255,255,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+
+[data-theme="dark"] .card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+}
+
+[data-theme="dark"] .pill {
+  background: #2c2c2e;
+  color: #f5f5f7;
+  border-color: rgba(255,255,255,0.1);
+}
+
+[data-theme="dark"] .pill:hover {
+  background: #3a3a3c;
+}
+
+[data-theme="dark"] .pill.active {
+  background: #f5f5f7;
+  color: #1c1c1e;
+  border-color: #f5f5f7;
+}
+
+[data-theme="dark"] .seg-group {
+  background: #2c2c2e;
+}
+
+[data-theme="dark"] .seg-btn {
+  color: #98989d;
+}
+
+[data-theme="dark"] .seg-btn:hover {
+  color: #f5f5f7;
+}
+
+[data-theme="dark"] .seg-btn.active {
+  background: #3a3a3c;
+  color: #f5f5f7;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+[data-theme="dark"] .spinner {
+  border-color: #3a3a3c;
+  border-top-color: #f5f5f7;
+}
+
+/* Override common Tailwind color utilities in dark mode */
+[data-theme="dark"] [class*="text-[#1d1d1f]"] { color: #f5f5f7 !important; }
+[data-theme="dark"] [class*="text-[#86868b]"] { color: #98989d !important; }
+[data-theme="dark"] [class*="text-[#424245]"] { color: #aeaeb2 !important; }
+[data-theme="dark"] [class*="text-[#d2d2d7]"] { color: #48484a !important; }
+[data-theme="dark"] [class*="bg-[#f5f5f7]"] { background-color: #2c2c2e !important; }
+[data-theme="dark"] [class*="bg-white"] { background-color: #1c1c1e !important; }
+[data-theme="dark"] [class*="bg-muted"] { background-color: #000000 !important; }
+[data-theme="dark"] [class*="border-black"] { border-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] [class*="border-[#e5e5ea]"] { border-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] [class*="border-[#f5f5f7]"] { border-color: rgba(255,255,255,0.06) !important; }
+
+/* Dark mode for inputs and selects */
+[data-theme="dark"] input,
+[data-theme="dark"] select {
+  background-color: #2c2c2e !important;
+  color: #f5f5f7 !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+
+[data-theme="dark"] input::placeholder {
+  color: #636366 !important;
+}
+
+/* Dark mode for SVG text */
+[data-theme="dark"] svg text[fill="#86868b"] { fill: #98989d; }
+[data-theme="dark"] svg line[stroke="#e5e5ea"] { stroke: rgba(255,255,255,0.08); }
+[data-theme="dark"] svg line[stroke="#1d1d1f"] { stroke: #f5f5f7; }
+[data-theme="dark"] svg circle[stroke="#f5f5f7"] { stroke: #2c2c2e; }
+
+/* Dark mode for bg-muted/60, bg-white rounded cards inside components */
+[data-theme="dark"] [class*="bg-muted/60"] { background-color: rgba(44,44,46,0.6) !important; }
+[data-theme="dark"] [class*="bg-muted/50"] { background-color: rgba(44,44,46,0.5) !important; }
+[data-theme="dark"] [class*="bg-red/5"] { background-color: rgba(255,59,48,0.1) !important; }
+[data-theme="dark"] [class*="bg-[#0071e3]/8"] { background-color: rgba(0,113,227,0.15) !important; }
+
+/* Dark mode tooltip */
+[data-theme="dark"] [class*="bg-white/95"] { background-color: rgba(44,44,46,0.95) !important; }
+[data-theme="dark"] [class*="bg-white/80"] { background-color: rgba(28,28,30,0.80) !important; }
+
+/* Dark mode theme toggle */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 980px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: white;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.theme-toggle:hover {
+  background: #f5f5f7;
+}
+
+[data-theme="dark"] .theme-toggle {
+  background: #2c2c2e;
+  border-color: rgba(255,255,255,0.1);
+}
+
+[data-theme="dark"] .theme-toggle:hover {
+  background: #3a3a3c;
+}
+
+/* Competition bar chart dark mode */
+[data-theme="dark"] .competition-bar-bg {
+  background-color: #2c2c2e !important;
+}

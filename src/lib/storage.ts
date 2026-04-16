@@ -93,4 +93,16 @@ export const storage = {
   setTeamOptConfig(teamId: string, config: TeamOptConfig): void {
     set(`opt_config_${teamId}`, config);
   },
+  getTheme(): "light" | "dark" {
+    if (typeof window === "undefined") return "light";
+    try {
+      const raw = localStorage.getItem(PREFIX + "theme");
+      return raw === '"dark"' ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  },
+  setTheme(theme: "light" | "dark"): void {
+    set("theme", theme);
+  },
 };

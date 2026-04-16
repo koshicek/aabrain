@@ -14,6 +14,11 @@ export default function RootLayout({
   return (
     <html lang="cs" className="h-full antialiased">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("aabrain_theme");if(t==='"dark"')document.documentElement.dataset.theme="dark";}catch(e){}})();`,
+          }}
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
           rel="stylesheet"

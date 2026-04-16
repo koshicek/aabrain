@@ -45,6 +45,20 @@ export default function Dashboard() {
   const [report, setReport] = useState<DailyReport | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResponse | null>(null);
+  const [theme, setThemeState] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const saved = storage.getTheme();
+    setThemeState(saved);
+    document.documentElement.dataset.theme = saved;
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    setThemeState(next);
+    document.documentElement.dataset.theme = next;
+    storage.setTheme(next);
+  }
 
   // Login
   const [username, setUsername] = useState("");
@@ -244,9 +258,14 @@ export default function Dashboard() {
             <a href="/overview" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Overview</a>
             <span className="text-[13px] font-medium text-[#1d1d1f]">Daily Report</span>
           </div>
-          <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">
-            Odhlásit
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} className="theme-toggle" title={theme === "light" ? "Tmavý režim" : "Světlý režim"}>
+              {theme === "light" ? "\u263E" : "\u2600"}
+            </button>
+            <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">
+              Odhlásit
+            </button>
+          </div>
         </div>
       </header>
 
@@ -485,32 +504,11 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ── Competition ── */}
+            {/* ── Competition Bar Chart ── */}
             {report.categoryCompetition.length > 0 && (
-              <div className="card p-7 overflow-x-auto">
+              <div className="card p-7">
                 <h2 className="text-[17px] font-semibold text-[#1d1d1f] mb-5">Konkurence v kategoriích</h2>
-                <table className="w-full text-[14px]">
-                  <thead>
-                    <tr className="text-[13px] text-[#86868b] border-b border-[#e5e5ea]">
-                      <th className="pb-3 pr-6 text-left font-medium">Kategorie</th>
-                      <th className="pb-3 pr-6 text-right font-medium">Konkurenti</th>
-                      <th className="pb-3 pr-6 text-right font-medium">Tržní CPC</th>
-                      <th className="pb-3 pr-6 text-right font-medium">Imprese</th>
-                      <th className="pb-3 text-right font-medium">Click share</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.categoryCompetition.slice(0, 20).map((cat) => (
-                      <tr key={cat.category} className="border-b border-[#f5f5f7] last:border-0 hover:bg-muted/50">
-                        <td className="py-3.5 pr-6 truncate max-w-[200px] text-[#1d1d1f]" title={cat.category}>{cat.category}</td>
-                        <td className="py-3.5 pr-6 text-right text-[#86868b]">{cat.competitors}</td>
-                        <td className="py-3.5 pr-6 text-right text-[#1d1d1f]">{cat.marketCpc.toFixed(2)}</td>
-                        <td className="py-3.5 pr-6 text-right text-[#86868b]">{fmtInt(cat.totalImpressions)}</td>
-                        <td className="py-3.5 text-right font-medium text-[#1d1d1f]">{(cat.clickShare * 100).toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <CategoryCompetitionChart data={report.categoryCompetition} />
               </div>
             )}
 
@@ -890,6 +888,42 @@ function TrendChart({ data, currency = "CZK" }: { data: DailyMetrics[]; currency
           <span className="w-3 h-[2px] bg-[#0071e3] rounded-full opacity-70" /> Spend
         </div>
       </div>
+    </div>
+  );
+}
+
+function CategoryCompetitionChart({ data }: { data: Array<{ category: string; competitors: number; marketCpc: number; totalImpressions: number; clickShare: number }> }) {
+  const sorted = [...data].sort((a, b) => b.clickShare - a.clickShare).slice(0, 15);
+  const maxShare = Math.max(...sorted.map((d) => d.clickShare), 0.01);
+
+  return (
+    <div className="space-y-2.5">
+      {sorted.map((cat) => {
+        const pct = cat.clickShare * 100;
+        const barWidth = (cat.clickShare / maxShare) * 100;
+        return (
+          <div key={cat.category} className="flex items-center gap-4">
+            <div className="w-[180px] shrink-0 truncate text-[13px] text-[#1d1d1f]" title={cat.category}>
+              {cat.category}
+            </div>
+            <div className="flex-1 flex items-center gap-3">
+              <div className="flex-1 h-7 bg-[#f5f5f7] rounded-lg overflow-hidden competition-bar-bg">
+                <div
+                  className="h-full bg-bright rounded-lg transition-all duration-500"
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+              <span className="text-[13px] font-semibold text-[#1d1d1f] w-14 text-right tabular-nums">
+                {pct.toFixed(1)}%
+              </span>
+            </div>
+            <div className="hidden md:flex items-center gap-4 shrink-0 text-[12px] text-[#86868b]">
+              <span className="w-20 text-right" title="Konkurenti">{cat.competitors} konk.</span>
+              <span className="w-20 text-right" title="Tržní CPC">CPC {cat.marketCpc.toFixed(2)}</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
