@@ -77,6 +77,14 @@ export interface CountryQuarterlyActual {
   obratCzk: number;
 }
 
+export interface DailyTopVendor {
+  vendorId: string;
+  vendorName: string;
+  yesterdayObrat: number;  // CZK
+  dayBeforeObrat: number;  // CZK
+  change: number;  // percentage
+}
+
 export interface OverviewReport {
   dateFrom: string;
   dateTo: string;
@@ -87,5 +95,6 @@ export interface OverviewReport {
   totalQuarters: QuarterMetrics[];
   dailyView: DailyOverview[];
   topVendors: TopVendor[];
+  dailyTopVendors: DailyTopVendor[];
   generatedAt: string;
 }

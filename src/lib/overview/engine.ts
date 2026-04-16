@@ -9,6 +9,7 @@ import type {
   TotalWeekly,
   DailyOverview,
   TopVendor,
+  DailyTopVendor,
   QuarterlyActual,
   CountryQuarterlyActual,
   OverviewReport,
@@ -89,6 +90,13 @@ export function buildOverviewReport(
     supplier_id: string;
     team_name: string;
     week_start: { value: string } | string;
+    currency: string;
+    obrat: number;
+  }>,
+  dailyVendorRows: Array<{
+    supplier_id: string;
+    team_name: string;
+    d: { value: string } | string;
     currency: string;
     obrat: number;
   }>,
@@ -319,6 +327,39 @@ export function buildOverviewReport(
     .filter((q) => qaMap.has(q))
     .map((q) => ({ quarter: q, obratCzk: Math.round((qaMap.get(q) || 0) * 100) / 100 }));
 
+  // ── Daily top vendors (yesterday vs day before) ──
+  const dailyVendorDates = new Set(dailyVendorRows.map((r) => bqDate(r.d)));
+  const sortedDailyDates = Array.from(dailyVendorDates).sort().reverse();
+  const yesterday = sortedDailyDates[0] || "";
+  const dayBefore = sortedDailyDates[1] || "";
+
+  const dvAgg = new Map<string, { name: string; yesterdayObrat: number; dayBeforeObrat: number }>();
+  for (const r of dailyVendorRows) {
+    const d = bqDate(r.d);
+    if (d !== yesterday && d !== dayBefore) continue;
+    const key = r.supplier_id;
+    const cur = r.currency || "CZK";
+    const obratCzk = toCzk(num(r.obrat), cur, rates);
+    const ex = dvAgg.get(key) || { name: r.team_name || key, yesterdayObrat: 0, dayBeforeObrat: 0 };
+    if (d === yesterday) {
+      ex.yesterdayObrat += obratCzk;
+    } else {
+      ex.dayBeforeObrat += obratCzk;
+    }
+    dvAgg.set(key, ex);
+  }
+
+  const dailyTopVendors: DailyTopVendor[] = Array.from(dvAgg.entries())
+    .map(([id, v]) => ({
+      vendorId: id,
+      vendorName: v.name,
+      yesterdayObrat: Math.round(v.yesterdayObrat),
+      dayBeforeObrat: Math.round(v.dayBeforeObrat),
+      change: v.dayBeforeObrat > 0 ? Math.round(((v.yesterdayObrat - v.dayBeforeObrat) / v.dayBeforeObrat) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.yesterdayObrat - a.yesterdayObrat)
+    .slice(0, 20);
+
   return {
     dateFrom,
     dateTo,
@@ -329,6 +370,7 @@ export function buildOverviewReport(
     totalQuarters,
     dailyView,
     topVendors,
+    dailyTopVendors,
     generatedAt: new Date().toISOString(),
   };
 }

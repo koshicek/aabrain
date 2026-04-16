@@ -98,7 +98,8 @@ export default function Overview() {
             <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
             <span className="text-[13px] text-[#86868b]">Brain</span>
             <span className="text-[#d2d2d7] mx-3">|</span>
-            <span className="text-[13px] font-medium text-[#1d1d1f]">Overview</span>
+            <span className="text-[13px] font-medium text-[#1d1d1f]">Přehled</span>
+            <a href="/overview/daily" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Denní přehled</a>
             <a href="/dashboard" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Daily Report</a>
           </div>
           <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Odhlásit</button>
@@ -108,7 +109,13 @@ export default function Overview() {
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         {error && <ErrorBanner error={error} onClose={() => setError(null)} />}
 
-        <h1 className="text-[24px] font-semibold tracking-tight text-[#1d1d1f] mb-8">alzaAds Přehled</h1>
+        <div className="flex items-center gap-4 mb-8">
+          <h1 className="text-[24px] font-semibold tracking-tight text-[#1d1d1f]">alzaAds Přehled</h1>
+          <button onClick={fetchReport} disabled={state === "fetching"}
+            className="text-[13px] text-[#0071e3] hover:text-[#0077ed] disabled:opacity-40 font-medium">
+            {state === "fetching" ? "Načítání..." : "Obnovit"}
+          </button>
+        </div>
 
         {state === "fetching" && (
           <div className="flex flex-col items-center py-24">

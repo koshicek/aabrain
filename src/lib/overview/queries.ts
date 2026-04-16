@@ -134,6 +134,35 @@ export async function queryDailyOverview(dateTo: string) {
   }>(sql, { dateTo });
 }
 
+// Q4: Top vendors by yesterday's ad_spend, with day-before comparison
+export async function queryDailyTopVendors(dateTo: string) {
+  const sql = `
+    SELECT
+      r.supplier_id,
+      t.team_name,
+      r.ingressed_at AS d,
+      COALESCE(c.currency_code, 'CZK') AS currency,
+      ROUND(SUM(r.ad_spend), 2) AS obrat
+    FROM \`${DATASET}.fact_realised_ad_agg\` r
+    LEFT JOIN (
+      SELECT campaign_id, currency_code FROM \`${DATASET}.dim_campaign\` WHERE is_current = true
+    ) c ON r.campaign_id = c.campaign_id
+    LEFT JOIN (
+      SELECT team_id, team_name FROM \`${DATASET}.dim_team\` WHERE is_current = true AND team_type = 'SUPPLIER'
+    ) t ON r.supplier_id = t.team_id
+    WHERE r.ingressed_at >= DATE_SUB(PARSE_DATE('%Y-%m-%d', @dateTo), INTERVAL 2 DAY)
+      AND r.ingressed_at <= PARSE_DATE('%Y-%m-%d', @dateTo)
+    GROUP BY r.supplier_id, t.team_name, r.ingressed_at, c.currency_code
+  `;
+  return q<{
+    supplier_id: string;
+    team_name: string;
+    d: { value: string } | string;
+    currency: string;
+    obrat: number;
+  }>(sql, { dateTo });
+}
+
 // Q3: Top vendors by revenue (last 2 full weeks for WoW comparison)
 export async function queryTopVendors(dateTo: string) {
   const sql = `
