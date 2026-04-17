@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { storage } from "@/lib/storage";
+import { AppShell } from "@/components/sidebar";
 import type { TeamWithName, Campaign, Wallet } from "@/lib/citrusad/types";
 import type {
   TeamOptConfig,
@@ -45,20 +46,6 @@ export default function Dashboard() {
   const [report, setReport] = useState<DailyReport | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResponse | null>(null);
-  const [theme, setThemeState] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    const saved = storage.getTheme();
-    setThemeState(saved);
-    document.documentElement.dataset.theme = saved;
-  }, []);
-
-  function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    setThemeState(next);
-    document.documentElement.dataset.theme = next;
-    storage.setTheme(next);
-  }
 
   // Login
   const [username, setUsername] = useState("");
@@ -247,29 +234,8 @@ export default function Dashboard() {
 
   // ── Authenticated dashboard ──
   return (
-    <div className="min-h-screen bg-muted">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-black/5">
-        <div className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
-            <span className="text-[13px] text-[#86868b] font-normal">Brain</span>
-            <span className="text-[#d2d2d7] mx-3">|</span>
-            <a href="/overview" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Overview</a>
-            <span className="text-[13px] font-medium text-[#1d1d1f]">Daily Report</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className="theme-toggle" title={theme === "light" ? "Tmavý režim" : "Světlý režim"}>
-              {theme === "light" ? "\u263E" : "\u2600"}
-            </button>
-            <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">
-              Odhlásit
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
+    <AppShell currentPath="/dashboard">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Error */}
         {error && (
           <div className="card px-5 py-3 mb-6 flex items-center justify-between border-l-4 border-l-red">
@@ -578,8 +544,8 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

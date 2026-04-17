@@ -240,3 +240,18 @@ button, a, select, input {
 [data-theme="dark"] .competition-bar-bg {
   background-color: #2c2c2e !important;
 }
+
+/* Sidebar dark mode */
+[data-theme="dark"] aside {
+  background-color: rgba(28,28,30,0.8) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+}
+
+[data-theme="dark"] aside nav a.bg-\[#0071e3\]\/10 {
+  background-color: rgba(0,113,227,0.15) !important;
+}
+
+/* Mobile drawer dark mode */
+[data-theme="dark"] .fixed.w-\[260px\] {
+  background-color: #1c1c1e !important;
+}

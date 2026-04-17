@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { storage } from "@/lib/storage";
+import { AppShell } from "@/components/sidebar";
 import type { OverviewReport, CountryWeekly, TotalWeekly, QuarterMetrics, DailyOverview, TopVendor } from "@/lib/overview/types";
 
 type ViewState = "loading" | "idle" | "fetching" | "ready" | "error";
@@ -17,21 +18,6 @@ export default function Overview() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
-
-  const [theme, setThemeState] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    const saved = storage.getTheme();
-    setThemeState(saved);
-    document.documentElement.dataset.theme = saved;
-  }, []);
-
-  function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    setThemeState(next);
-    document.documentElement.dataset.theme = next;
-    storage.setTheme(next);
-  }
 
   function handleLogout() {
     storage.clearToken(); setToken(null); setState("idle"); setReport(null);
@@ -106,27 +92,8 @@ export default function Overview() {
 
   // ── Authenticated ──
   return (
-    <div className="min-h-screen bg-muted">
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/80 border-b border-black/5">
-        <div className="max-w-[1400px] mx-auto px-6 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">alzaAds</span>
-            <span className="text-[13px] text-[#86868b]">Brain</span>
-            <span className="text-[#d2d2d7] mx-3">|</span>
-            <span className="text-[13px] font-medium text-[#1d1d1f]">Přehled</span>
-            <a href="/overview/daily" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Denní přehled</a>
-            <a href="/dashboard" className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Daily Report</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className="theme-toggle" title={theme === "light" ? "Tmavý režim" : "Světlý režim"}>
-              {theme === "light" ? "\u263E" : "\u2600"}
-            </button>
-            <button onClick={handleLogout} className="text-[13px] text-[#86868b] hover:text-[#1d1d1f]">Odhlásit</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-[1400px] mx-auto px-6 py-8">
+    <AppShell currentPath="/overview">
+      <div className="max-w-[1400px] mx-auto px-6 py-8">
         {error && <ErrorBanner error={error} onClose={() => setError(null)} />}
 
         <div className="flex items-center gap-4 mb-8">
@@ -181,8 +148,8 @@ export default function Overview() {
             )}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
 
